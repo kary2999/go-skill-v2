@@ -1,0 +1,53 @@
+name: Build DMG (CI)
+
+# 每次推 main / 提 PR 都自动编译并打 DMG，产物放在本次 Actions 运行的 Artifacts 里（保留 14 天）。
+# 不创建 Release；正式发布仍走 release.yml（改 VERSION 并推 main，或打 v* tag）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 单元测试
+        run: go test ./...
+
+      - name: 构建 Team Standards.app（Universal Binary）
+        run: bash build-mac-app.sh
+
+      - name: 打包 DMG
+        id: dmg
+        run: |
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          DMG="TeamStandards-v${VERSION}-${GITHUB_SHA::7}.dmg"
+          mkdir -p dmg-root
+          ditto "Team Standards.app" "dmg-root/Team Standards.app"
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname "Team Standards ${VERSION}" -srcfolder dmg-root -ov -format UDZO "$DMG"
+          echo "name=$DMG" >> "$GITHUB_OUTPUT"
+          ls -la "$DMG"
+
+      - name: 上传 DMG 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dmg.outputs.name }}
+          path: ${{ steps.dmg.outputs.name }}
+          retention-days: 14
+          if-no-files-found: error
