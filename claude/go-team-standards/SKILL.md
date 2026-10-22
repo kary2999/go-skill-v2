@@ -259,6 +259,7 @@ Kratos v2 + Wire + Buf + `mask-go-common-lib`。**禁绕过 common-lib**：
 | handler / HTTP / REST / endpoint | `references/error-codes.md` |
 | 写接口文档 / 接口 README / API doc | `references/api-doc.md`（接口文档完整示例） |
 | DB / SQL / 建表 / migration / GORM / PG | `references/database.md` + `demos/pg-*.go` |
+| **MySQL / 建表（MySQL 场景）** | `references/mysql-database.md` + `references/field-naming.md`（与 PG 规范冲突处以 MySQL 规范为准） |
 | 日志 / log / slog / trace | `references/naming-logging.md` |
 | **字段命名 / 列名 / 接口字段 / Proto field** | `references/field-naming.md` —— ID/时间/状态/金额/布尔/审计/备注/网络/加密 9 大类 + 禁用别名 + 缩写白名单 |
 | **Kafka topic / Redis key 命名** | `references/field-naming.md` + `references/database.md` §7/§8 —— **必须带域前缀**，无前缀拒绝产出 |

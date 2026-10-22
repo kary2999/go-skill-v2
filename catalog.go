@@ -99,6 +99,12 @@ var skills = []Skill{
 		Triggers:  []string{"生成订单号 / ID", "定义主键", "**/*.go"},
 		Reference: "id-generation.md", Scope: "conditional",
 	},
+	{
+		ID: "mysql-database", Title: "MySQL 设计",
+		Description: "MySQL 8.x / InnoDB：UUIDv7 BINARY(16) 主键 / create_time 毫秒 + created_at TIMESTAMP / 无软删除 / 分区 / 在线 DDL / 安全",
+		Triggers:  []string{"MySQL / 建表", "migrations/**", "**/*.sql"},
+		Reference: "mysql-database.md", Scope: "conditional",
+	},
 }
 
 // ============================================================
