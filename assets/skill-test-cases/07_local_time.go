@@ -2,7 +2,7 @@
 
 // skill-test-case: 违反铁律 #7 —— 时间不带时区 / 本地时间
 // 期望 AI 指出：跨区 + 跨 DC 部署下本地时间边界会产生一天差；夏令时切换还会重复/消失。
-// 必须 UTC 存 TIMESTAMPTZ(6)，对外 ISO 8601 含时区。
+// 必须 UTC：业务时间存 BIGINT 毫秒时间戳（{动作}_time），响应外壳 timestamp 用 ISO 8601 UTC。
 
 package skilltest
 

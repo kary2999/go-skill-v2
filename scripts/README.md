@@ -35,7 +35,7 @@ Skill 是 Layer 1（advisory）。本目录的脚本是 Layer 2 + Layer 3。
 | **P0** 阻断 | 铁律 #1 · 硬编码密钥 | 所有 |
 | **P0** 阻断 | 铁律 #6 · 金额 float | .go / .sql |
 | **P0** 阻断 | 铁律 #12 · 敏感数据进日志 | .go |
-| **P1** 重要 | 铁律 #2 · errors.New 不走 xerror | .go |
+| **P1** 重要 | 铁律 #2 · errors.New 不走 AppError | .go |
 | **P1** 重要 | 铁律 #3 · _ = err 丢弃 | .go |
 | **P1** 重要 | 铁律 #9 · SELECT * | .go / .sql |
 | **P1** 重要 | 铁律 #10 · 数据库外键 | .sql / .go |

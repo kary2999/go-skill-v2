@@ -64,16 +64,18 @@ func coverageBundles() []bundleSpec {
 	// go-team-standards references 实际是 standards/*.md 的符号链接，
 	// install.go 装的时候直接 copyEmbedFile("standards/xxx.md", ...) —— 所以 embed 源头在 standards/
 	gtsRefs := []string{
-		"api-design.md", "ci-pipeline.md", "commit.md", "cursor-usage.md",
+		"api-doc.md", "ci-pipeline.md", "commit.md", "cursor-usage.md",
 		"database.md", "error-codes.md", "glossary.md", "go-style.md",
 		"naming-logging.md", "testing.md",
 		// v1.7.14 新增
 		"code-review.md", "deployment-checklist.md",
-		"feature-flags.md", "api-doc-example.md",
+		"feature-flags.md",
 		// v1.7.17 新增
 		"meeting-minutes.md", "tech-design-example.md", "tixuebj-template-simple.md",
 		// v1.7.20 新增
 		"field-naming.md",
+		// v2.0.0 新增
+		"id-generation.md", "redis.md", "kafka.md", "frontend.md",
 	}
 	gtsFiles := []specFile{
 		{InstallRel: "SKILL.md", EmbedPath: "claude/go-team-standards/SKILL.md"},
@@ -87,10 +89,10 @@ func coverageBundles() []bundleSpec {
 	}
 	// demos 也是 copyEmbedDir("demos", ...) 从顶级 demos/
 	for _, n := range []string{
-		"README.md", "errno-xerror.go", "kafka-consumer.go", "kafka-producer.go",
-		"kratos-service-min.go", "pg-gorm-repo.go", "pg-migration.sql",
-		"redis-idempotency.go", "slog-trace.go", "table-driven-test.go",
-		"wire-providerset.go",
+		"README.md", "apperror.go", "kafka-consumer.go", "kafka-producer.go",
+		"gin-service-min.go", "mysql-gorm-repo.go", "mysql-migration.sql",
+		"redis-cache.go", "slog-trace.go", "table-driven-test.go",
+		"outbox-relay.go",
 	} {
 		gtsFiles = append(gtsFiles, specFile{
 			InstallRel: "demos/" + n,
@@ -104,7 +106,8 @@ func coverageBundles() []bundleSpec {
 		"00-iron-laws.mdc", "01-go-style.mdc", "02-naming-logging.mdc",
 		"03-error-codes.mdc", "04-api-design.mdc", "05-database.mdc",
 		"06-testing.mdc", "07-commit.mdc", "08-ci-pipeline.mdc",
-		"10-common-lib.mdc", "11-demos.mdc",
+		"09-id-generation.mdc", "10-common-lib.mdc", "11-demos.mdc",
+		"12-redis.mdc", "13-kafka.mdc", "14-frontend.mdc", // v2.0.0 新增
 		"15-doc-trigger.mdc", // v1.7.22 新增：globs 强行按 .md 触发
 		"99-cursor-security.mdc",
 	} {

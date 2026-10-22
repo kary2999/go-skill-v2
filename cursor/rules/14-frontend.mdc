@@ -1,0 +1,19 @@
+---
+description: Frontend conventions — contract with backend, request wrapper, money/time handling, errors, security
+globs: **/*.ts, **/*.tsx, **/*.vue, **/*.js, **/*.jsx
+alwaysApply: false
+---
+
+# 前端开发规范（通用约定，详见 references/frontend.md）
+
+- 契约：后端维护接口文档与错误码登记；前端维护 TS 类型与错误码 / 枚举文案；破坏性变更升 `/api/v2` 并行；前端容忍未知字段与未知枚举值
+- **全项目只有一个请求入口**；页面禁止直接 `fetch` / `axios`
+- 响应外壳 `{code,msg,data,trace_id,timestamp}`：`code === "0"` 成功；其余抛 `ApiError`；**用 `code` 判断，不用 `msg`**
+- 401：过期刷新一次重放，无效直接登出；403 / 409 / 429 不自动重试；写接口不自动重试；读接口 5xx / 超时最多重试 1–2 次
+- 写接口带 `X-Idempotency-Key`（一次用户操作一个，重试复用）；按钮禁用不是幂等手段；不要设置 `X-User-Id`
+- 金额 / 数量 / 价格是 **string**：用十进制库（decimal.js / big.js）运算，**禁止 parseFloat / Number / toFixed 后提交**；ID 当字符串；业务时间是毫秒数，仅展示层转本地时区
+- 游标原样回传，不解析；切换过滤 / 排序重置 `page` / `cursor`；`total === -1` 不显示总页数
+- 错误提示 = `i18n(errors[code])`，缺失回退 `msg`；提示附带 `trace_id`；不展示堆栈 / SQL / 内部信息
+- 安全：Token 不放 URL、避免长期放 localStorage；不用 innerHTML 渲染接口内容；敏感数据默认脱敏；资金操作二次确认并展示完整地址 / 金额 / 手续费；权限以后端为准
+- 质量：TS `strict`、禁 `any`；CI 跑 typecheck / lint / test / build；请求封装与金额 / 时间工具必须有单测
+- 发布：API 基地址走环境变量；产物带内容哈希，`index.html` no-cache；保留上一版本用于秒级回滚

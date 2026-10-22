@@ -1,5 +1,5 @@
 ---
-description: Order ID / distributed primary key must use UUIDv7 (via common-lib idgen)
+description: Order ID / distributed primary key must use UUIDv7 stored as BINARY(16) (via common-lib idgen)
 globs: **/*.go, migrations/**, **/*.sql
 alwaysApply: false
 ---
@@ -7,17 +7,19 @@ alwaysApply: false
 # 订单号 / 分布式 ID 规范
 
 ## 核心
-- 订单号及所有分布式主键 **一律 UUIDv7**（RFC 9562，时间有序）
-- Go 用 `github.com/google/uuid` 的 `NewV7()`，**封装到 common-lib 的 `idgen` 包**，业务代码禁止裸调用
-- PG 主键列类型用原生 `uuid`（非 varchar），ID 由**应用层生成**，不用 `gen_random_uuid()` 默认值
+- 订单号及所有分布式主键 **一律 UUIDv7**（RFC 9562，时间有序，48 位毫秒时间戳约 8920 年才耗尽）
+- Go 用 `github.com/google/uuid` 的 `NewV7()`，**封装到公共库 `util/idgen`**，业务代码禁止裸调用
+- MySQL 主键列 `BINARY(16)`（不用 `CHAR(36)`），ID 由**应用层生成**；表内主键叫 `id`，引用时叫 `{entity}_id`，API / Kafka 中为 36 位字符串
+- ⚠️ 公共库 `util/idgen` 目前只有 UUIDv4，须先补 UUIDv7 才能落地
 
 ## 禁止
-- ❌ 数据库自增（IDENTITY / AUTO_INCREMENT）
-- ❌ 雪花算法 / 自研发号器
+- ❌ 数据库自增（`AUTO_INCREMENT`）
+- ❌ 雪花算法 / 自研发号器（41 位时间戳约 69.7 年耗尽、依赖时钟与 worker-id、63 位超出 JS 安全整数）
 - ❌ `order_no` 顺序号 / 日期拼计数器
-- ❌ UUIDv4（无序，作主键写放大）
+- ❌ UUIDv4（无序，作主键写放大）、UUIDv1（含 MAC）
+- ❌ `UUID_TO_BIN(x, 1)` 的 swap_flag（会破坏 UUIDv7 顺序）
 
-## 可读号
-- 需人类可读订单号时，另加 `order_ref` 展示字段，与主键 `order_id` 解耦；展示号不作主键、不参与关联
-
-字段命名仍遵循命名规范：`order_id` / `client_order_id` / `parent_order_id`。
+## 撞号与业务唯一性
+- INSERT 命中主键冲突（1062）→ 重新生成并重试 ≤ 3 次
+- 业务幂等靠 `idempotency_key` / `client_order_id` 等业务唯一键，不靠 ID 唯一性
+- 需要人类可读订单号时，另加 `order_ref` 展示字段，不作主键、不参与关联

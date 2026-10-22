@@ -1,100 +1,67 @@
 ---
-description: PostgreSQL schema design, naming, migrations, query rules
-globs: migrations/**, **/*.sql, **/model.go, **/data/**
+description: MySQL 8.4 schema design, naming, migrations, query rules
+globs: migrations/**, **/*.sql, **/data/**
 alwaysApply: false
 ---
 
-# 数据库规范（PostgreSQL）
+# 数据库规范（MySQL 8.4 / InnoDB）
 
-## 命名通则
-- 全 `snake_case` 小写；长度 ≤ 63 字符
-- 禁止保留字（`order`、`user`、`group`、`date`、`value` …），可查 `SELECT pg_get_keywords();`
-- 禁止特殊字符、非英文字母、`pg_`/`_` 开头
-- 禁止匈牙利前缀（`tbl_`、`col_`）
-- 禁止英数字无意义混杂（`order1`、`table2`）
+## 基线
+- 仅 InnoDB；`utf8mb4` + `utf8mb4_0900_bin`（建表显式写出）；实例时区 UTC；隔离级别 `READ COMMITTED`；严格 `sql_mode`
+- 所有服务经 ProxySQL 接入，连接池单服务 ≤ 50；DSN 必带 `charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true&timeout=3s&readTimeout=5s&writeTimeout=5s`
 
-## Database / Schema
-- Database：`{业务线}_{用途}` → `exchange_main`；分片 `_shard` 后缀
-- Schema 按业务模块：`trade` / `wallet` / `auth` / `market` / `risk` / `audit`
-- **禁止在 `public` 建业务表**；`search_path` 显式设置
-- `audit` schema 只追加，禁止修改
+## 命名
+- 全 `snake_case` 小写；长度 ≤ 64；禁止保留字（`order` / `user` / `key` / `rank` …），**不要靠反引号规避，改名**
+- Database = 业务域：`trade` / `wallet` / `auth` / `market` / `risk` / `audit`；禁跨库 JOIN / 跨库事务
+- 表前缀：无前缀核心业务 / `dim_` / `agg_` / `cfg_` / `log_`（只追加）/ `hist_`（只追加）/ `rel_` / `tmp_` / `v_` / `{主表}_ext`；MySQL 无物化视图
+- 索引：`uk_{表}_{字段}` / `idx_{表}_{字段}` / `ck_{表}_{含义}`，总长 ≤ 64
 
-## 表命名（前缀即类型）
-| 前缀 | 类型 | 示例 |
-|---|---|---|
-| 无 | 核心业务 | `trade.orders`, `wallet.balances` |
-| `dim_` | 维度 | `dim_user_profile` |
-| `agg_` | 聚合统计 | `agg_trade_volume_daily` |
-| `cfg_` | 配置 | `cfg_fee_rules` |
-| `log_` | 事件日志（只追加） | `log_order_audit` |
-| `hist_` | 历史快照（只追加） | `hist_account_balance` |
-| `rel_` | 多对多（按字母序） | `rel_user_role` |
-| `tmp_` | 临时（带时间粒度） | `tmp_settlement_batch` |
-| `v_` / `mv_` | 视图 / 物化视图 | `v_active_orders` |
-| `<主表>_ext` | 垂直拆分扩展 | `users_ext` |
-- 分区子表 `{父表}_{分区特征}` → `orders_2024q1`
-
-## 字段
-- 主键：`id BIGINT GENERATED ALWAYS AS IDENTITY PK`（或 UUID）
-- 逻辑外键：`{关联表单数}_id` → `order_id`（用户字段统一 `uid`，禁 `user_id`）
-- **禁止**数据库级 `FOREIGN KEY`
-- 字段名**不含**所在表名（`users.name` ✓，`users.user_name` ✗；关联字段除外）
-- **业务字段默认 NOT NULL**（除 `TEXT` 类型字段和 `deleted_at`）
-- 必备字段：`created_at` / `updated_at` / `deleted_at`（软删，允许 NULL）/ `created_by` / `updated_by`
-- 语义后缀：`_at`(TIMESTAMPTZ) / `_date` / `_amount` / `_count` / `_status` / `_type`；布尔 `is_`/`has_` 前缀
-- **只软删**：`deleted_at`，禁止物理删除
+## 必备字段（每表）
+```sql
+`id`          BINARY(16)      NOT NULL COMMENT '主键 UUIDv7，应用层生成',
+`create_time` BIGINT UNSIGNED NOT NULL COMMENT '创建时间，毫秒时间戳（UTC）',
+`update_time` BIGINT UNSIGNED NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
+`created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+`updated_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+```
+- `create_time` / `update_time` 由应用层写，业务以它们为准；`created_at` / `updated_at` 由库维护，仅运维参考
+- 业务时间点一律 `{动作}_time BIGINT UNSIGNED`（毫秒）；`TIMESTAMP` 仅限 `created_at` / `updated_at`（2038 上限）
+- **不设** `deleted_at` / `created_by` / `updated_by`；**不使用软删除**，允许物理 DELETE（资金类先归档，批量分批 ≤ 1000）
+- **禁止** `FOREIGN KEY`、`AUTO_INCREMENT`、触发器 / 存储过程 / EVENT
+- 多租户表加 `platform_id VARCHAR(32)` / `uid VARCHAR(64)`，索引前缀含 `platform_id`；用户字段统一 `uid`
 
 ## 字段类型
 | 场景 | 类型 |
 |---|---|
-| 时间戳 | `TIMESTAMPTZ(6)` UTC |
-| 纯日期 | `DATE` |
-| 金额/数量 | `DECIMAL(28,8)` — **禁止 FLOAT/DOUBLE** |
-| 枚举/状态 | `SMALLINT` + 代码常量（**禁止 ENUM 类型**），`0` 保留给未知 |
-| 定长字符串 | `CHAR(n)` |
-| 变长 | `VARCHAR(n)`（必须明确长度） |
-| 大文本 | `TEXT`（仅备注/日志；查询条件字段必须 `VARCHAR`） |
-| JSON | `JSONB`（**禁止 JSON**）；仅非核心扩展属性，≤ 64KB，不作主要查询条件 |
+| 加密货币数量 / 余额 / 价格 | `DECIMAL(38,18)`（**禁止 FLOAT/DOUBLE**） |
+| 法币 / U 卡金额 | `DECIMAL(28,8)` |
+| 费率 | `DECIMAL(10,8)` |
+| 枚举 / 状态 / 布尔 | `TINYINT UNSIGNED` + 代码常量，`0` 保留未知；**禁止 ENUM / BOOLEAN**；布尔列 `is_` 前缀 |
+| 固定 / 变长字符串 | `CHAR(n)` / `VARCHAR(n)`（按真实需求给长度） |
+| IP | `VARBINARY(16)`（`INET6_ATON`） |
+| JSON | `JSON`，仅非核心扩展属性，≤ 64KB，不作主要查询条件 |
+| 业务字段 | 默认 `NOT NULL` + 默认值（除 `TEXT` / `JSON`） |
 
-## 索引
-- 关联字段（`uid` / `order_id` 等）必加索引
-- WHERE / ORDER BY 高频字段加索引
-- 单表 ≤ 8 个索引；组合遵循最左前缀
-- 高基数差字段（如 `status`）不建普通索引
-- 命名：`uk_{表}_{字段}` 唯一 / `idx_{表}_{字段}` 普通 / `ck_{表}_{字段}` check
+## 主键 UUIDv7
+- 应用层 `idgen` 生成；`BINARY(16)`（不用 `CHAR(36)`）；不要 `UUID_TO_BIN(x, 1)`
+- 手写 SQL 用 `UUID_TO_BIN(?)` 配 36 位字符串；**不要把 `[]byte` 直接当 GORM 的 `?` 参数**（会展开成多个参数）
+- 业务逻辑不依赖数据库生成的 ID，不读 `LAST_INSERT_ID()`；翻页用 `create_time`，`id` 仅作同毫秒 tie-breaker
 
-## 注释
-所有生产表/字段必须 `COMMENT`；状态类字段枚举值必须列全。
+## 索引与查询
+- 逻辑外键字段必须建索引；单表索引 ≤ 8；组合索引最左前缀；范围列放最后
+- 禁止隐式类型转换；禁止 `SELECT *`、`ORDER BY RAND()`、`LIKE '%x'`、循环内查询
+- 大分页用游标（`create_time` + `id`），禁止大 OFFSET；`IN` ≤ 200；`JOIN` ≤ 3 张
+- 禁止 `REPLACE INTO`；`INSERT ... ON DUPLICATE KEY UPDATE` 仅限单唯一键表
+- 乐观锁：`UPDATE ... SET version = version + 1, update_time = ? WHERE id = ? AND version = ?`，检查 `RowsAffected`
+- 死锁（1213）/ 锁超时（1205）整个事务重试最多 3 次；慢查询阈值 200ms
 
-## Migration
-- 工具：`golang-migrate` 或 `goose`，目录 `migrations/`
-- 文件名：`000001_xxx.up.sql` / `000001_xxx.down.sql`（必须成对）
-- **禁止修改已发布 Migration**；每次变更独立文件
-- 大表 DDL（>100 万行）用 `gh-ost` / `pt-online-schema-change`
-- 数据回填与 DDL 分开 Migration
-- **生产环境禁止人工 DDL**
-
-## 审批
-| 变更 | 审批 |
-|---|---|
-| 新增表 | Tech Lead |
-| 新增字段/索引 | 同组 Review |
-| 改字段类型 | Tech Lead + DBA |
-| 删表/字段 | Tech Lead + DBA + 产品 |
-| 大表变更 | DBA 专项 |
-
-## 查询
-- **禁止 `SELECT *`**
-- 禁止循环内查询（N+1）→ 批量 / JOIN
-- 大分页用游标（`WHERE id > ? LIMIT ?`），禁止大 OFFSET
-- 事务最小化，持锁时间尽量短
-- 慢查询阈值 200ms
-
-## Role
-- 按服务粒度；格式 `{服务名}_{级别}` → `trade_service_read` / `trade_service_write`
-- 禁止多服务共用 Role；流复制 Role 固定 `replication`
+## Migration（goose）
+- 文件 `{6位序号}_{库}_{描述}.sql`（`-- +goose Up/Down`）；一个文件只改一个库，尽量只放一条 DDL（MySQL DDL 隐式提交）
+- 禁止修改已发布 Migration；数据回填独立文件
+- 在线 DDL 显式写 `ALGORITHM` / `LOCK`；大表（> 100 万行）用 `gh-ost`；生产禁止人工 DDL
+- 大表（> 2000 万行 / 20GB）按 `create_time` 分区，分区键须进入主键与所有唯一键
 
 ## 安全
-- 敏感字段（手机号/身份证/银行卡）加密存储
-- 生产禁止开发直连，走堡垒机 + 审计日志
-- 备份：全量每日 + 增量每小时，保留 30 天
+- 敏感字段应用层 AES-256-GCM（不用 `AES_ENCRYPT`），后缀 `_enc` / `_hash`
+- 账号按服务最小权限；`log_*` / `hist_*` 只授 `INSERT, SELECT`；生产禁止开发直连
+- 备份全量每日 + binlog，保留 30 天；每月演练

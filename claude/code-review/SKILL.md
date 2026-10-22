@@ -8,7 +8,7 @@ description: |
   与 `/review` slash command 共享同一套规则，但 `/review` 由用户主动调，本 Skill 默认被动。
 
   ✅ 强触发（不等用户问）：
-  - AI 刚生成 .go / .sql / .proto / .ts / Dockerfile / Makefile 代码 → 交付前自检
+  - AI 刚生成 .go / .sql / .ts / Dockerfile / Makefile 代码 → 交付前自检
   - 用户粘 ≥10 行实际代码 + 模糊问句（"看下"/"这样行吗"/"帮我改"）
 
   ✅ 显式触发：
@@ -67,7 +67,7 @@ description: |
 | 级 | 含义 | 例子 |
 |---|---|---|
 | **P0 阻断** | 必须改才能交付 | 硬编码密钥 · SQL 注入 · 金额 float64 · 业务路径 panic · 敏感数据进日志 |
-| **P1 重要** | 强烈建议改 | errors.New 不走 xerror · 命名规范违反 · 无 ctx 调 IO · SELECT * |
+| **P1 重要** | 强烈建议改 | errors.New 不走 AppError · 命名规范违反 · 无 ctx 调 IO · SELECT * |
 | **P2 改进** | 应该改但不阻断 | 日志缺 trace_id · 变量名不达意 · 函数过长（>80 行） |
 | **P3 建议** | 可选优化 | 性能微优化 · 重构机会 · 注释完善 |
 
@@ -161,8 +161,8 @@ description: |
 </details>
 
 ### ✅ 自动确认通过
-- 错误处理走 xerror（铁律 #2）
-- 时间字段 _at + UTC（铁律 #7）
+- 错误处理走 AppError + errcode（铁律 #2）
+- 业务时间毫秒 `_time`、create_time/update_time 必备（铁律 #7）
 - 输出已带 trace_id（铁律 #13）
 
 ### ⚠️ 已存在问题（本次未改，建议后续重构）
@@ -194,15 +194,15 @@ TODO[review:<级别>·<规则编号> conf=<分>]: <原> → <推荐>（<一句�
 | # | 铁律 | grep / 检测要点 |
 |---|---|---|
 | 1 | 禁硬编码密钥 | `sk-` / `kgb_` / `password=` / `Bearer ` 字面量 |
-| 2 | error 走 xerror | `errors.New(` 直接调（除非 init 阶段） |
+| 2 | 业务 error 走 `AppError` | `errors.New(` 直接调 / handler 里字面量错误码（除非 init 阶段） |
 | 3 | error 必检 + `%w` | `_ = err` / 跨层 `fmt.Errorf` 不带 `%w` |
 | 4 | 业务禁 panic | `panic(` 不在 main/init/启动路径 |
 | 5 | goroutine 必带 ctx | `go func()` 无 ctx 形参 |
 | 6 | 金额 decimal | `float64` + 字段名含 amount/balance/fee/price |
-| 7 | 时间 _at + UTC | `time.Now()` 直调 / 字段非 `_at` 后缀 |
-| 8 | 日志 slog + trace | `fmt.Println` / `log.Printf` 当业务日志 |
+| 7 | 业务时间毫秒 `_time` | `time.Now()` 直调 / 业务时间非 `BIGINT` 毫秒 / UPDATE 漏写 `update_time` |
+| 8 | 日志 logging + trace | `fmt.Println` / `log.Printf` 当业务日志 |
 | 9 | 禁 `SELECT *` / N+1 | `SELECT \*` / 循环内 `db.Query` / OFFSET 分页 |
-| 10 | 禁 DB 外键 | DDL `FOREIGN KEY` / GORM `foreignKey` tag |
+| 10 | 禁外键 / 自增主键 / 软删除 | DDL `FOREIGN KEY` / `AUTO_INCREMENT` / `deleted_at` / GORM `foreignKey` tag |
 | 11 | 禁死代码 | 大段 `//` 注释掉的代码 |
 | 12 | 敏感数据禁入日志 | log/test fixture 含 phone/email/id_card |
 | 13 | 外部 IO 必带超时 + ctx | `http.Get(` / `db.Exec(` 不传 ctx |
@@ -211,14 +211,14 @@ TODO[review:<级别>·<规则编号> conf=<分>]: <原> → <推荐>（<一句�
 | 命名违规 | 推荐 | 规范段 |
 |---|---|---|
 | `user_id` / `userId` / `member_id` | `uid` | §1.2 |
-| `gmt_create` / `create_time` / `ctime` | `created_at` | §2.2 |
-| `gmt_modified` / `update_time` | `updated_at` | §2.2 |
-| `is_deleted` BOOLEAN | `deleted_at TIMESTAMPTZ` | §5.2 |
+| `gmt_create` / `ctime` / 缺 `create_time` | `create_time`（BIGINT 毫秒）+ `created_at`（TIMESTAMP 库维护） | §2.2 |
+| `gmt_modified` / 缺 `update_time` | `update_time` + `updated_at` | §2.2 |
+| `is_deleted` / `deleted_at` 软删除 | 本项目不使用软删除 | §5.2 |
 | 裸 `amount` | `<业务>_amount`（`order_amount`） | §4.2 |
 | `vol` / `size` / `amt` | `quantity` / `_qty` | §4.3 |
 | 裸 `version`（业务） | `rule_version` / `config_version` | §6.3 |
 | 布尔非 `is_` 前缀 | `is_<x>_enabled` | §5.1 |
-| 裸 `time` / `ts` 业务列 | `<动作>_at` | §2.1 |
+| 裸 `time` / `ts` / `xxx_at` 业务列 | `<动作>_time` BIGINT 毫秒 | §2.1 |
 | `txid` / `transaction_hash` | `tx_hash` | §1.5 |
 | `ip_addr` / `login_ip` | `client_ip` | §8 |
 | 裸 `request_id` 跨域 | `<域>_request_id` | §1.6 |

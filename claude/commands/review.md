@@ -76,13 +76,15 @@ argument-hint: <可选：文件路径 / "diff" / 留空>
 详细见 `code-review` skill 的 §6 表格。常踩雷：
 
 - **铁律 #1** 硬编码密钥（grep `sk-` / `kgb_` / `password=`）
-- **铁律 #2** errors.New 不走 xerror
+- **铁律 #2** errors.New / 字面量错误码，不走 `AppError` + `errcode`
 - **铁律 #6** 金额 float64
 - **铁律 #9** SELECT * / N+1 / OFFSET 分页
 - **铁律 #13** http.Get / db.Exec 无 ctx 无超时
 - **命名 §1.2** user_id → uid
-- **命名 §2.2** gmt_create → created_at
-- **命名 §5.2** is_deleted BOOLEAN → deleted_at TIMESTAMPTZ
+- **命名 §2.2** gmt_create → create_time（毫秒）/ created_at（库维护）
+- **命名 §5.2 / database §4.4** is_deleted / deleted_at 软删除字段 → 本项目不使用软删除
+- **database §4.1** 缺 create_time / update_time，或 UPDATE 没写 update_time
+- **database §4.6** 业务时间用 TIMESTAMP / DATETIME → BIGINT 毫秒 `{动作}_time`
 - **命名 §4.2** 裸 amount → 业务前缀（order_amount）
 
 ## 6. 禁止

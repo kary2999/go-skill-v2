@@ -38,12 +38,12 @@ type Catalog struct {
 
 var skills = []Skill{
 	{
-		ID: "iron-laws", Title: "铁律", Description: "团队无条件执行的 12 条硬约束（密钥/金额/时间/错误/并发/日志/SQL 等）",
+		ID: "iron-laws", Title: "铁律", Description: "团队无条件执行的 14 条硬约束（密钥/金额/时间/错误/并发/日志/SQL 等）",
 		Triggers: []string{"所有 Go 文件", "所有 SQL", "提交 commit 时"},
 		Reference: "go-style.md", Scope: "always",
 	},
 	{
-		ID: "go-style", Title: "Go 编码风格", Description: "项目结构（Kratos + Wire）、命名、并发、错误、注释、golangci-lint",
+		ID: "go-style", Title: "Go 编码风格", Description: "项目结构（Gin 分层 handler → biz → data）、命名、并发、错误、注释、golangci-lint",
 		Triggers: []string{"**/*.go"},
 		Reference: "go-style.md", Scope: "conditional",
 	},
@@ -53,12 +53,12 @@ var skills = []Skill{
 		Reference: "naming-logging.md", Scope: "always",
 	},
 	{
-		ID: "error-codes", Title: "错误码体系", Description: "受控 errno 常量 + xerror.New；IDP 注册 → codegen → CI linter 强制",
+		ID: "error-codes", Title: "错误码体系", Description: "业务码 {SERVICE}_{MODULE}_{NNN} + AppError + errcode 包；先登记后使用，CI 校验",
 		Triggers: []string{"return error 时"},
 		Reference: "error-codes.md", Scope: "conditional",
 	},
 	{
-		ID: "database", Title: "PostgreSQL 设计", Description: "Schema / 表命名前缀 / 字段类型（DECIMAL/TIMESTAMPTZ/JSONB）/ 索引 / Migration / 审批",
+		ID: "database", Title: "MySQL 设计", Description: "库 / 表命名 / 必备字段（create_time 毫秒 + created_at）/ UUIDv7 BINARY(16) 主键 / 无软删除 / 索引 / 分区 / Migration / 安全",
 		Triggers: []string{"migrations/**", "**/*.sql"},
 		Reference: "database.md", Scope: "conditional",
 	},
@@ -78,7 +78,7 @@ var skills = []Skill{
 		Reference: "ci-pipeline.md", Scope: "manual",
 	},
 	{
-		ID: "common-lib", Title: "优先用 common-lib", Description: "禁止绕过 mask-go-common-lib 直连底层库（sarama/go-redis/otel/…），一张替换表",
+		ID: "common-lib", Title: "优先用 common-lib", Description: "禁止绕过 gin-go-common-lib 直连底层库（kafka-go / go-redis / gorm.Open / c.JSON …），一张替换表",
 		Triggers: []string{"**/*.go"},
 		Reference: "glossary.md", Scope: "conditional",
 	},
@@ -95,15 +95,33 @@ var skills = []Skill{
 	},
 	{
 		ID: "id-generation", Title: "订单号 / 分布式 ID",
-		Description: "订单号及分布式主键一律 UUIDv7；禁止自增 / 雪花 / 顺序号；common-lib idgen 封装 + PG uuid 主键",
+		Description: "订单号及分布式主键一律 UUIDv7；禁止自增 / 雪花 / 顺序号；idgen 封装 + MySQL BINARY(16) 主键",
 		Triggers:  []string{"生成订单号 / ID", "定义主键", "**/*.go"},
 		Reference: "id-generation.md", Scope: "conditional",
 	},
 	{
-		ID: "mysql-database", Title: "MySQL 设计",
-		Description: "MySQL 8.x / InnoDB：UUIDv7 BINARY(16) 主键 / create_time 毫秒 + created_at TIMESTAMP / 无软删除 / 分区 / 在线 DDL / 安全",
-		Triggers:  []string{"MySQL / 建表", "migrations/**", "**/*.sql"},
-		Reference: "mysql-database.md", Scope: "conditional",
+		ID: "api-doc", Title: "接口规范（REST + JSON）",
+		Description: "REST 方法与 URL、统一响应体 {code,msg,data,trace_id,timestamp}、HTTP 状态码映射、分页 / 游标、幂等、接口文档模板",
+		Triggers:  []string{"写接口 / handler", "接口文档", "前后端联调"},
+		Reference: "api-doc.md", Scope: "conditional",
+	},
+	{
+		ID: "redis", Title: "Redis 使用规范",
+		Description: "Key 命名（naming.RedisKey）、Cache-Aside、TTL 抖动、分布式锁、幂等第一道防线、大 Key / 热 Key",
+		Triggers:  []string{"Redis / 缓存 / 锁", "**/*cache*.go"},
+		Reference: "redis.md", Scope: "conditional",
+	},
+	{
+		ID: "kafka", Title: "Kafka 使用规范",
+		Description: "Topic 命名、统一消息信封、Outbox、幂等消费（去重表）、handler 内重试 + 死信",
+		Triggers:  []string{"Kafka / 事件 / 消费", "Outbox"},
+		Reference: "kafka.md", Scope: "conditional",
+	},
+	{
+		ID: "frontend", Title: "前端开发规范",
+		Description: "前后端契约分工、请求封装、金额 / 时间处理、错误码文案、安全、发布（不限定框架）",
+		Triggers:  []string{"前端 / 页面 / 联调", "请求封装"},
+		Reference: "frontend.md", Scope: "conditional",
 	},
 }
 
@@ -389,20 +407,20 @@ func extractFrontmatterTitle(fp string) string {
 }
 
 var demos = []Demo{
-	{ID: "kratos-service", File: "kratos-service-min.go", Title: "Kratos 服务骨架", Description: "最小 main.go：config + logging + tracing + alarm + wire", Keywords: []string{"kratos", "新服务", "main", "骨架", "启动"}},
-	{ID: "wire-di", File: "wire-providerset.go", Title: "Wire 依赖注入", Description: "ProviderSet 声明 + wire.Build + 生成约定", Keywords: []string{"wire", "di", "依赖注入", "providerset"}},
-	{ID: "kafka-producer", File: "kafka-producer.go", Title: "Kafka 生产者", Description: "mq.NewProducer + naming.TopicInProject 命名规范", Keywords: []string{"kafka", "生产者", "publish", "发消息", "topic"}},
-	{ID: "kafka-consumer", File: "kafka-consumer.go", Title: "Kafka 消费者", Description: "mq.NewConsumer + 错误分流（协议错误不重试）+ 优雅退出", Keywords: []string{"kafka", "consumer", "消费", "订阅"}},
-	{ID: "pg-migration", File: "pg-migration.sql", Title: "PG Migration 模板", Description: "goose up/down + 必备字段 + 索引 + COMMENT", Keywords: []string{"建表", "migration", "goose", "schema", "pg"}},
-	{ID: "pg-gorm-repo", File: "pg-gorm-repo.go", Title: "GORM Repo 模式", Description: "context timeout + 软删 + 游标分页 + 显式列字段", Keywords: []string{"gorm", "repo", "crud", "查询", "游标分页"}},
-	{ID: "redis-idempotency", File: "redis-idempotency.go", Title: "Redis 幂等 & 分布式锁", Description: "redisx.Store + SETNX 幂等 + Lua 解锁", Keywords: []string{"redis", "幂等", "锁", "idempotency", "lock"}},
-	{ID: "errno-xerror", File: "errno-xerror.go", Title: "errno / xerror", Description: "错误码常量 + xerror.New + %w 包装", Keywords: []string{"errno", "xerror", "错误码", "return error"}},
-	{ID: "slog-trace", File: "slog-trace.go", Title: "slog + OTel 日志", Description: "结构化日志 + ctx 提取 trace_id/span_id + error_code 标签", Keywords: []string{"slog", "日志", "trace_id", "logging"}},
+	{ID: "gin-service", File: "gin-service-min.go", Title: "Gin 服务骨架", Description: "最小 main.go：logging + middleware + 统一响应 + 幂等 + MySQL/Redis 初始化 + 优雅退出", Keywords: []string{"gin", "新服务", "main", "骨架", "启动", "handler"}},
+	{ID: "apperror", File: "apperror.go", Title: "AppError 错误码", Description: "internal/errcode 定义业务错误码 + biz 返回 + handler FailErr", Keywords: []string{"错误码", "errcode", "apperror", "return error"}},
+	{ID: "mysql-migration", File: "mysql-migration.sql", Title: "MySQL Migration 模板", Description: "goose up/down + UUIDv7 主键 + create_time/update_time + 索引 + COMMENT", Keywords: []string{"建表", "migration", "goose", "schema", "mysql"}},
+	{ID: "mysql-gorm-repo", File: "mysql-gorm-repo.go", Title: "GORM Repo 模式", Description: "ctx 超时 + BINARY(16) + 乐观锁 + 游标分页 + 物理删除 + 1062 处理", Keywords: []string{"gorm", "repo", "crud", "查询", "游标分页", "乐观锁"}},
+	{ID: "kafka-producer", File: "kafka-producer.go", Title: "Kafka 生产者", Description: "naming.TopicInProject + 统一信封 + PublishWithHeaders", Keywords: []string{"kafka", "生产者", "publish", "发消息", "topic"}},
+	{ID: "kafka-consumer", File: "kafka-consumer.go", Title: "Kafka 消费者", Description: "去重表同事务 + handler 内重试 + 死信（不依赖返回 error）", Keywords: []string{"kafka", "consumer", "消费", "订阅", "死信"}},
+	{ID: "outbox-relay", File: "outbox-relay.go", Title: "Outbox relay", Description: "SKIP LOCKED 取数 + 保序发送 + 失败重试", Keywords: []string{"outbox", "本地消息表", "relay", "最终一致"}},
+	{ID: "redis-cache", File: "redis-cache.go", Title: "Redis 缓存 & 分布式锁", Description: "Cache-Aside + singleflight + TTL 抖动 + SET NX + Lua 释放", Keywords: []string{"redis", "缓存", "锁", "lock", "击穿"}},
+	{ID: "slog-trace", File: "slog-trace.go", Title: "logging 日志", Description: "公共库 logging + trace_id + 字段约定", Keywords: []string{"slog", "日志", "trace_id", "logging"}},
 	{ID: "table-test", File: "table-driven-test.go", Title: "表驱动单测", Description: "testify/assert + mockgen + 命名约定", Keywords: []string{"单测", "表驱动", "mockgen", "mock", "测试"}},
 }
 
 var glossarySections = []string{
-	"Go 语言生态", "构建 / 依赖 / 代码生成", "团队自建组件（mask-go-common-lib）",
+	"Go 语言生态", "构建 / 依赖 / 代码生成", "团队自建组件（gin-go-common-lib）",
 	"可观测性", "云原生 / Kubernetes / 服务网格", "CI / CD 与质量门禁",
 	"安全 / 合规", "消息队列特有术语", "常见命令 / 工具",
 }

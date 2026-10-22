@@ -40,7 +40,7 @@ func TestCreateOrder_Old(t *testing.T) {
 	_ = now
 
 	// ❌ 直连真 DB
-	db, _ := sql.Open("postgres", "postgres://localhost/prod")
+	db, _ := sql.Open("mysql", "root@tcp(localhost:3306)/prod")
 	defer db.Close()
 
 	// 场景 1

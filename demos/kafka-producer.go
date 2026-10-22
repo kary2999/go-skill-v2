@@ -1,49 +1,77 @@
-// Demo: Kafka 生产者 — 使用 mask-go-common-lib/mq 与 naming 命名规范
-// 禁止直接用 sarama / kafka-go 裸客户端（会绕开命名规范与可观测性）
-package demo
+// Demo: Kafka 发布事件 — internal/data/event_publisher.go
+// 对应 kafka.md：Topic 由 naming 包构造；统一消息信封；PublishWithHeaders 带 trace_id / platform_id / idempotency_key；Publish 必带超时。
+// 注意：业务代码不要在“提交 MySQL 之后”直接调用本发布器——会丢消息。
+// 业务事务内只写 outbox_events（见 outbox-relay.go），由 relay 调用本发布器发送。
+package data
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
-	"github.com/company/mask-go-common-lib/mq"
-	"github.com/company/mask-go-common-lib/naming"
+	"gin-go-common-lib/logging"
+	"gin-go-common-lib/mq"
+	"gin-go-common-lib/naming"
 )
 
-// OrderPaidEvent 是业务事件载荷。字段 snake_case，便于跨语言消费。
-type OrderPaidEvent struct {
-	OrderID   string `json:"order_id"`
-	UserID    string `json:"user_id"`
-	AmountRaw string `json:"amount_raw"` // 金额走字符串，避免 JSON 精度丢失
-	PaidAt    int64  `json:"paid_at"`    // Unix 毫秒
+// Envelope 统一消息信封（kafka.md §2.1）。字段 snake_case，时间为毫秒时间戳。
+type Envelope struct {
+	EventID       string          `json:"event_id"`       // UUIDv7，消费端幂等依据
+	EventType     string          `json:"event_type"`     // 如 order.pay_status_updated
+	SchemaVersion int             `json:"schema_version"` // 载荷结构版本
+	OccurredTime  int64           `json:"occurred_time"`  // 毫秒时间戳 UTC
+	PlatformID    string          `json:"platform_id"`
+	Payload       json.RawMessage `json:"payload"`
 }
 
-// OrderProducer 用构造注入，禁止全局单例。
-type OrderProducer struct {
-	p     mq.Producer
-	topic string
+// Publisher 事件发布器。
+type Publisher struct {
+	producer *mq.Producer
+	env      string // dev / test / staging / prod
+	log      *logging.Logger
 }
 
-func NewOrderProducer(cfg *mq.Config) (*OrderProducer, func(), error) {
-	p, cleanup, err := mq.NewProducer(cfg)
-	if err != nil {
-		return nil, nil, err
+// NewPublisher 构造函数注入。生产环境 Topic 由运维预建，不依赖 Producer 自动建 Topic。
+func NewPublisher(brokers []string, env string, log *logging.Logger) *Publisher {
+	naming.MustValidateKafkaEnv(env) // 启动期校验环境名，不合规直接 panic（仅允许在启动阶段）
+	return &Publisher{
+		producer: mq.NewProducer(mq.ProducerConfig{Brokers: brokers, ClientID: "trade-service"}),
+		env:      env,
+		log:      log,
 	}
-	// 命名规范：{env}_{service}_{entity}_{action}
-	topic := naming.TopicInProject(cfg.Env, "order", "pay_status", "updated")
-	return &OrderProducer{p: p, topic: topic}, cleanup, nil
 }
 
-// PublishPaid 发送订单已支付事件。ctx 必须来自上游（携带 trace/span）。
-func (op *OrderProducer) PublishPaid(ctx context.Context, evt *OrderPaidEvent) error {
-	payload, err := json.Marshal(evt)
+// OrderStatusTopic 构造订单状态事件 Topic：{env}_{service}_{biz}_{action}，一律走 naming。
+func (p *Publisher) OrderStatusTopic() string {
+	return naming.TopicInProject(p.env, "trade", "order_status", "updated")
+}
+
+// Publish 发送一条事件。key 用业务主键（如 order_id），保证同一订单进同一分区、有序。
+func (p *Publisher) Publish(ctx context.Context, topic, key string, env Envelope, traceID string) error {
+	body, err := json.Marshal(env)
 	if err != nil {
-		return err // 上层 wrap 用 fmt.Errorf("marshal order paid: %w", err)
+		return fmt.Errorf("marshal envelope: %w", err)
 	}
-	// mq.Producer 内部会把 ctx 里的 trace header 注入到 Kafka message headers
-	return op.p.Send(ctx, op.topic, evt.OrderID /* partition key */, payload)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second) // Publish 必带超时（铁律 13）
+	defer cancel()
+	headers := map[string]string{
+		"trace_id":        traceID,
+		"platform_id":     env.PlatformID,
+		"idempotency_key": env.EventID,
+	}
+	if err := p.producer.PublishWithHeaders(ctx, topic, []byte(key), body, headers); err != nil {
+		// 日志不记录消息体（可能含敏感数据），只记录定位信息
+		p.log.Error(ctx, "publish event failed", "topic", topic, "event_id", env.EventID, "err", err)
+		return fmt.Errorf("publish %s: %w", topic, err)
+	}
+	return nil
 }
 
-// 跨项目 topic 示例：
-//   topic := naming.TopicCrossProject(cfg.Env, "pay", "order", "record")
-//   → prod_pay_to_order_record
+// PublishRaw 原样转发一条消息（用于写死信 Topic：{原 topic}_dlq）。
+func (p *Publisher) PublishRaw(ctx context.Context, topic string, key, value []byte) error {
+	return p.producer.Publish(ctx, topic, key, value)
+}
+
+// Close 优雅退出时关闭。
+func (p *Publisher) Close() error { return p.producer.Close() }

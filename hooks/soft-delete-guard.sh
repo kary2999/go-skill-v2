@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # soft-delete-guard · PostToolUse
-# 铁律：软删除必须用 deleted_at TIMESTAMPTZ，禁止 is_deleted BOOLEAN
-# 来源：database.md §字段语义后缀规范
+# 铁律：本项目不使用软删除，禁止 is_deleted / deleted_at / is_alive 字段
+# 来源：database.md §4.4
 
 set -euo pipefail
 
@@ -35,22 +35,18 @@ esac
 
 [[ ! -f "$FILE_PATH" ]] && exit 0
 
-# 检测 is_deleted（字段定义或结构体中）
-HITS=$(grep -niE '\bis_deleted\b' "$FILE_PATH" \
+# 检测软删除字段（字段定义或结构体中）
+HITS=$(grep -niE '\b(is_deleted|deleted_at|is_alive)\b' "$FILE" \
   | grep -v '^\s*//' | head -5 || true)
 
 if [[ -n "$HITS" ]]; then
-  echo "🚫 [soft-delete-guard] 铁律违反：禁止使用 is_deleted，软删除统一用 deleted_at"
+  echo "🚫 [soft-delete-guard] 铁律违反：本项目不使用软删除，禁止 is_deleted / deleted_at / is_alive"
   echo ""
-  echo "文件：$FILE_PATH"
+  echo "文件：$FILE"
   echo "违规行："
   echo "$HITS" | while IFS= read -r line; do echo "  $line"; done
   echo ""
-  echo "📖 依据：database.md — 软删除字段一律 deleted_at TIMESTAMPTZ(6)，禁止 is_deleted BOOLEAN"
-  echo "✅ 修复："
-  echo "   SQL:  deleted_at TIMESTAMPTZ(6) DEFAULT NULL"
-  echo "   Go:   DeletedAt *time.Time \`json:\"deleted_at\"\`"
-  echo "   查询: WHERE deleted_at IS NULL"
+  echo "📖 依据：database.md §4.4 删除策略 —— 允许物理 DELETE（资金类数据先归档），需要保留状态时用 xxx_status"
   exit 1
 fi
 

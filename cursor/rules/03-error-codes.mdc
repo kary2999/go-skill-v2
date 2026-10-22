@@ -1,39 +1,39 @@
 ---
-description: Error code system — registry-driven, xerror + errno constants only
+description: Error code system — AppError + errcode package, register then use
 globs: **/*.go
 alwaysApply: false
 ---
 
-# 错误码管理
+# 错误码管理（Gin + 公共库 errors / response）
 
-## 核心原则
-错误码是**受控元数据资产**：IDP 注册 → Git `error-codes` 仓库 → codegen → Go/TS/Dart SDK → 业务代码引用常量。
+## 格式
+`{SERVICE}_{MODULE}_{NNN}`，NNN 固定 3 位：`001-099` 校验 / `100-199` 认证授权 / `200-299` 不存在 / `300-399` 冲突 / `400-499` 限流 / `500-599` 内部异常。
 
 ## 写法
 ```go
 // ❌ 禁止
 return errors.New("order not found")
-return xerror.New(404, "order not found")
-return xerror.New(100404)             // 数字字面量禁止
+return &errors.AppError{Code: "TRADE_ORDER_201", ...}   // 字面量散落在业务代码
 
-// ✅ 标准
-import "github.com/company/pkg/errno"
-
-return xerror.New(errno.OrderNotFound).WithDetail("order id: 123")
+// ✅ 标准：errcode 包集中定义，biz 返回，handler 统一出口
+// internal/errcode/order.go
+func OrderNotFound() *errors.AppError {
+    return &errors.AppError{Code: "TRADE_ORDER_201", Msg: "order not found", HTTPStatus: 404}
+}
+// biz
+return nil, errcode.OrderNotFound()
+// handler
+response.FailErr(c, err)
 ```
 
-## CI Linter 检查逻辑
-1. 扫描 `return` 语句中的 `xerror.New(...)`。
-2. 第一个参数若为数字字面量或非 `errno` 包导出常量 → 报错。
-3. 必须引用 `errno` 包下的导出常量。
+## 流程：先登记后使用
+1. 在 `docs/error-codes.yaml` 登记（code / category / message_zh / message_en / http_status / owner）
+2. 同一个 PR 在 `internal/errcode` 新增函数
+3. CI 校验格式 / 区间 / 重复 / SERVICE 段等于本服务；errcode 包之外不得出现错误码字面量
 
-## 错误码规范
-- 按模块划分：10xx 用户、20xx 交易……
-- Enum Name `PascalCase`（`OrderNotFound`）。
-- 已发布错误码禁止删除，只能 `Deprecated`。
-- 紧急临时错误码需架构师批准 CI 跳过标签。
-
-## 可观测性
-- 日志自动注入 `error_code` 标签（Loki 过滤）。
-- Trace Attribute 注入错误码（Tempo 定位）。
-- VictoriaMetrics 统计错误码分布，识别业务策略问题。
+## 约束
+- 返回新实例的函数，不用包级 `var`
+- `Msg` 面向用户，不含 SQL / 堆栈 / 下游地址；排查信息写日志
+- 非 `AppError` 会被 `FailErr` 当作 `COMMON_COMMON_501`，且不暴露原文——所以原始 error 要在返回前记日志
+- 已发布错误码不可删除，只能标 `deprecated`
+- 不跨服务借用错误码

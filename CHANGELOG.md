@@ -4,6 +4,29 @@
 
 ---
 
+## [Unreleased] — v2 技术栈切换
+
+技术栈由 Kratos + gRPC + PostgreSQL 切换为 **Go + Gin + MySQL 8.4 + Redis + Kafka**；独立仓库 `go-skill-v2` / `standards-v2`，与旧版互不影响。
+
+### Changed
+- `database.md` 整体改为 MySQL 8.4 规范：UUIDv7 `BINARY(16)` 主键、`create_time` / `update_time`（毫秒）+ `created_at` / `updated_at`（TIMESTAMP）、无软删除、无 `created_by` / `updated_by`、分区 / 在线 DDL / 安全
+- `api-doc.md` 改为 REST + JSON 统一响应体（对齐公共库 `response` / `errors`）；`error-codes.md` 改为 `AppError` + `errcode` 包
+- `go-style.md`（Gin 分层 handler → biz → data）、`field-naming.md`、`id-generation.md`、`naming-logging.md`、`glossary.md`、`tech-design-example.md`（订单服务范例）按新栈重写
+- demos 全部替换：`gin-service-min` / `apperror` / `mysql-migration` / `mysql-gorm-repo` / `kafka-*` / `outbox-relay` / `redis-cache` / `slog-trace`；已在真实 MySQL 8.4.11 / Redis 7.2 上跑过集成测试（见 `demos/README.md`）
+- hooks（team-guard / git-commit-guard / soft-delete-guard / go-panic-guard）与 `scripts/team-standards-check.sh` 改为按新规范检查
+- Cursor 规则 / SKILL.md / slash commands / code-review 技能同步更新
+- 默认规范源改为 `kary2999/standards-v2`，更新源改为 `kary2999/go-skill-v2`；App 图标与页头 logo 换为圆角狮子 logo，并修复 `/icons/` 未内嵌导致页头图标显示为问号
+
+### Added
+- 新规范：`redis.md`、`kafka.md`、`frontend.md`（前端通用约定，不限定框架）
+- Cursor 规则：`12-redis.mdc` / `13-kafka.mdc` / `14-frontend.mdc`
+- CI：`build.yml`（每次 push / PR 自动编译并打 DMG，产物放 Artifacts）
+
+### Known gaps
+- 新建服务脚手架（`scaffold.go` 与 Web“新建服务”表单）仍生成 Kratos / PostgreSQL 项目，尚未改造
+- `docs/使用教程.md`、`claude/dev-dna` 示例画像仍含旧栈内容
+- 公共库 `gin-go-common-lib` 与规范的差距：`idgen` 无 UUIDv7、`mq.Consumer` 失败不重投、`model` 包为旧约定、校验错误字段名
+
 ## [1.9.2] — 2026-08-14
 
 ### Changed

@@ -14,11 +14,10 @@ alwaysApply: true
 - 包：简短、单数、语义化；`transport` ✓，`transport_layer` ✗；`util` / `models` ✗
 - 接口 `-er` 后缀；导出 `PascalCase`，非导出 `camelCase`；缩写保持同一大小写
 
-## 中间件命名（由 IDP 控制）
-- **Kafka Topic**：
-  - 项目内 `{env}_{service}_{entity}_{action}` → `prod_order_payStatus_updated`
-  - 跨项目 `{env}_{A}_2_{B}_{biz}` → `prod_pay_to_order_record`
-- **Redis Key**：`{业务名}:{模块}:{唯一标识}`（冒号分隔，供客户端分组）
+## 中间件命名（一律用公共库 `naming` 构造，禁止手拼）
+- **Kafka Topic**：项目内 `{env}_{service}_{biz}_{action}`，只含小写字母 / 数字 / 下划线 → `prod_order_pay_status_updated`（**不得驼峰、不得点分隔**）；跨项目 `{env}_{from}_2_{to}_{biz}` → `prod_pay_2_order_record`；死信 `{topic}_dlq`；消费者组 `{systemID}_{purpose}`（`naming.TopicInProject` / `TopicCrossProject` / `ConsumerGroup`）
+- **Redis Key**：`{业务域}:{模块}:{唯一标识}`，全小写、≥ 3 段、必带 TTL（`naming.RedisKey`）
+- **MySQL**：库 = 业务域；表 / 字段 / 索引见 `05-database.mdc`
 
 ## 链路追踪（W3C Trace Context）
 | 字段 | 格式 | 来源 |
@@ -28,7 +27,7 @@ alwaysApply: true
 | `parent_span_id` | 16 位 hex | OTel |
 
 ## 日志
-- **必须 JSON 格式**，`slog`。级别 `DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL`。
+- **必须 JSON 格式**，公共库 `logging`（基于 slog）。级别 `DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL`。
 - 字段全 `snake_case`。
 - **基础字段**：`env` `time` `level` `msg` `trace_id` `service` `caller` `cost_ms`
 - **请求日志**：`action` `status` `uid` `uri` `ip` `req` `res`

@@ -145,9 +145,9 @@ check_bare_errors_new() {
   grep -nE 'errors\.New\(' "$f" 2>/dev/null \
     | head -3 \
     | while IFS=: read -r line content; do
-        record P1 "铁律 #2 · errors.New 不走 xerror" "$f:$line" \
+        record P1 "铁律 #2 · errors.New 不走 AppError" "$f:$line" \
           "$(echo "$content" | head -c 80)" \
-          "xerror.New(errno.XxxCode)"
+          "errcode.Xxx()（*errors.AppError，handler 用 response.FailErr）"
       done
 }
 
@@ -282,17 +282,17 @@ check_naming_uid() {
   fi
 }
 
-# ---------- 命名 §2.2 · gmt_create / create_time → created_at ----------
+# ---------- 命名 §2.2 · gmt_create 等旧时间别名 → create_time / created_at ----------
 check_naming_time_field() {
   local f="$1"
   is_sql_file "$f" || is_go_file "$f" || is_proto_file "$f" || return
-  grep -nE '\b(gmt_create|gmt_modified|create_time|update_time|ctime|utime|created_time|updated_time)\b' "$f" 2>/dev/null \
+  grep -nE '\b(gmt_create|gmt_modified|ctime|utime|created_time|updated_time|modify_time)\b' "$f" 2>/dev/null \
     | head -3 \
     | while IFS=: read -r line content; do
         case "$content" in *"--"*) continue ;; esac
-        record P1 "命名 §2.2 · 时间字段统一 _at 后缀" "$f:$line" \
+        record P1 "命名 §2.2 · 时间字段别名" "$f:$line" \
           "$(echo "$content" | head -c 80)" \
-          "created_at / updated_at TIMESTAMPTZ(6) UTC"
+          "create_time / update_time（BIGINT UNSIGNED 毫秒）+ created_at / updated_at（TIMESTAMP，库维护）"
       done
 }
 
@@ -306,7 +306,7 @@ check_naming_bare_time() {
     | while IFS=: read -r line content; do
         record P2 "命名 §2.1 · 裸 time/timestamp/ts 列" "$f:$line" \
           "$(echo "$content" | head -c 80)" \
-          "用动作语义：executed_at / settled_at / verified_at"
+          "用动作语义：executed_time / settled_time / verified_time（BIGINT 毫秒）"
       done
 }
 
@@ -355,16 +355,16 @@ check_naming_bool_prefix() {
       done
 }
 
-# ---------- 命名 §5.2 · is_deleted → deleted_at ----------
+# ---------- 命名 §5.2 / database §4.4 · 不使用软删除 ----------
 check_naming_soft_delete() {
   local f="$1"
   is_sql_file "$f" || return
-  grep -niE 'is_deleted\s+(BOOLEAN|BOOL|TINYINT)' "$f" 2>/dev/null \
+  grep -niE '\b(is_deleted|deleted_at|is_alive)\b' "$f" 2>/dev/null \
     | head -3 \
     | while IFS=: read -r line content; do
-        record P1 "命名 §5.2 · 软删除统一 deleted_at" "$f:$line" \
+        record P1 "命名 §5.2 · 本项目不使用软删除" "$f:$line" \
           "$(echo "$content" | head -c 80)" \
-          "deleted_at TIMESTAMPTZ(6) （NULL 表示未删）"
+          "直接物理删除（资金类先归档），需保留状态用 xxx_status"
       done
 }
 

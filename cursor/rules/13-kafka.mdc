@@ -1,0 +1,16 @@
+---
+description: Kafka usage — topic naming, envelope, outbox, idempotent consume, DLQ
+globs: **/*kafka*.go, **/*consumer*.go, **/*producer*.go, **/job/**
+alwaysApply: false
+---
+
+# Kafka 使用规范（详见 references/kafka.md）
+
+- Topic：`{env}_{service}_{biz}_{action}`，小写字母数字下划线，**用 `naming.TopicInProject` 构造**；跨项目 `{env}_{from}_2_{to}_{biz}`；死信 `{topic}_dlq`；消费者组 `{systemID}_{purpose}`
+- 消息体统一信封：`event_id`（UUIDv7）/ `event_type` / `schema_version` / `occurred_time`（毫秒）/ `platform_id` / `payload`；金额与 ID 用字符串；头带 `trace_id` / `platform_id` / `idempotency_key`
+- 载荷只向后兼容（只增可选字段）；破坏性变更新建 Topic；载荷结构体放发布方 `contract/`，消费方引用同一份
+- **写库 + 发消息必须 Outbox**：同一 MySQL 事务写 `outbox_events`，relay 异步发送；禁止“提交后再 Publish”
+- 消费必须幂等：同事务写去重表（`consumed_events` 唯一键 `(consumer_group, event_id)`），1062 视为已处理
+- ⚠️ 公共库 `mq.Consumer` 在 handler 返回 error 时**不会重投**（后续提交会越过它）：重试 3 次（1s/5s/30s）+ 写 DLQ 必须在 handler 内自己做，并返回 nil
+- 生产者 `Publish` 带超时（3s）；生产环境关闭自动建 Topic；`acks=all`、副本 ≥ 3
+- 日志不记录消息体；指标 label 不用 `event_id` / `uid`

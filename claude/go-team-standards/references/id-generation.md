@@ -1,0 +1,1 @@
+../../../standards/id-generation.md

@@ -96,7 +96,7 @@ for FILE in $STAGED; do
       */cmd/*|*/main.go) ;;
       *)
         check_staged "$FILE" '\bpanic\(' '^\s*//' \
-          "go-panic" "业务代码禁止裸 panic，改用 xerror.New / xerror.Wrap" ;;
+          "go-panic" "业务代码禁止裸 panic，改为返回 *errors.AppError（error-codes.md §5）" ;;
     esac
 
     # fmt.Print* — 排除注释
@@ -120,8 +120,8 @@ for FILE in $STAGED; do
       "user-id" "全平台禁止 user_id，统一用 uid（field-naming §1.2）"
 
     # is_deleted
-    check_staged "$FILE" '\bis_deleted\b' '^\s*//' \
-      "soft-delete" "软删除禁用 is_deleted，统一用 deleted_at TIMESTAMPTZ（database §字段规范）"
+    check_staged "$FILE" '\b(is_deleted|deleted_at|is_alive)\b' '^\s*//' \
+      "soft-delete" "本项目不使用软删除：禁止 is_deleted / deleted_at（database.md §4.4）"
 
     # camelCase JSON tag（如 json:"userId" json:"createdAt"）
     CAMEL_HITS=$(grep -nE 'json:"[a-z][a-zA-Z]*[A-Z][a-zA-Z]*"' "$FILE" | grep -v '^\s*//' | head -5 || true)
@@ -134,7 +134,7 @@ $(echo "$CAMEL_HITS" | sed 's/^/   /')
     # 时间字段后缀检查：时间字段不含 _at 后缀
     TIME_HITS=$(grep -nE '\b(created|updated|deleted|expired|finished|started)(Time|Date|Timestamp)\b' "$FILE" | grep -v '^\s*//' | head -5 || true)
     if [[ -n "$TIME_HITS" ]]; then
-      WARNINGS+=("⚠️  [time-suffix] $FILE 时间字段建议用 _at 后缀（created_at 而非 createdTime）
+      WARNINGS+=("⚠️  [time-suffix] $FILE 时间字段用 create_time / update_time / {动作}_time（毫秒 int64），不要用驼峰命名（field-naming §2）
 $(echo "$TIME_HITS" | sed 's/^/   /')")
     fi
   fi
@@ -145,27 +145,35 @@ $(echo "$TIME_HITS" | sed 's/^/   /')")
     check_staged "$FILE" '\buser_id\b' '^\s*--' \
       "user-id(sql)" "全平台禁止 user_id 列，统一用 uid"
 
-    check_staged "$FILE" '\bis_deleted\b' '^\s*--' \
-      "soft-delete(sql)" "软删除禁用 is_deleted，统一用 deleted_at TIMESTAMPTZ NOT NULL DEFAULT NULL"
+    check_staged "$FILE" '\b(created_by|updated_by)\b' '^\s*--' \
+      "audit-by(sql)" "本项目不设 created_by / updated_by（database.md §4.1）"
+
+    check_staged "$FILE" 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^\s*--' \
+      "auto-increment(sql)" "主键用应用层生成的 UUIDv7 BINARY(16)，禁止自增（id-generation.md）"
+
+    check_staged "$FILE" '\b(ENUM|BOOLEAN|BOOL)\b\s*[(\s,]' '^\s*--' \
+      "enum-bool(sql)" "枚举 / 布尔用 TINYINT UNSIGNED，禁止 ENUM / BOOLEAN（database.md §4.6）"
+
+    check_staged "$FILE" '\b(is_deleted|deleted_at|is_alive)\b' '^\s*--' \
+      "soft-delete(sql)" "本项目不使用软删除：禁止 is_deleted / deleted_at（database.md §4.4）"
 
     # float 金额类型
     check_staged "$FILE" '\b(FLOAT|DOUBLE|REAL)\b.*(amount|price|fee|balance)|\b(amount|price|fee|balance)\b.*(FLOAT|DOUBLE|REAL)' '^\s*--' \
-      "float-amount(sql)" "金额列禁用 FLOAT/DOUBLE/REAL，改用 NUMERIC(18,8) 或 DECIMAL"
+      "float-amount(sql)" "金额列禁用 FLOAT/DOUBLE/REAL，改用 DECIMAL(38,18) / DECIMAL(28,8)"
 
     # CREATE TABLE 但缺少 created_at / updated_at
     if grep -qiE 'CREATE\s+TABLE' "$FILE"; then
-      if ! grep -qiE '\bcreated_at\b' "$FILE"; then
-        ERRORS+=("⛔ [sql-timestamps] $FILE 的 CREATE TABLE 缺少 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
-      fi
-      if ! grep -qiE '\bupdated_at\b' "$FILE"; then
-        ERRORS+=("⛔ [sql-timestamps] $FILE 的 CREATE TABLE 缺少 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
-      fi
+      for COL in create_time update_time created_at updated_at; do
+        if ! grep -qiE "\\b${COL}\\b" "$FILE"; then
+          ERRORS+=("⛔ [sql-timestamps] $FILE 的 CREATE TABLE 缺少 ${COL}（必备：create_time / update_time 毫秒 BIGINT，created_at / updated_at TIMESTAMP；database.md §4.1）")
+        fi
+      done
     fi
 
     # TIMESTAMP 未带时区（应用 TIMESTAMPTZ）— 找含 TIMESTAMP 但不含 TIMESTAMPTZ 的行
-    TS_HITS=$(grep -inE '\bTIMESTAMP\b' "$FILE" | grep -ivE '\bTIMESTAMPTZ\b|\bWITH TIME ZONE\b' | grep -v '^\s*--' | head -5 || true)
+    TS_HITS=$(grep -inE '\b(TIMESTAMPTZ|DATETIME|TIMESTAMP)\b' "$FILE" | grep -ivE '\b(created_at|updated_at)\b' | grep -v '^\s*--' | head -5 || true)
     if [[ -n "$TS_HITS" ]]; then
-      ERRORS+=("⛔ [timestamptz(sql)] $FILE 时间列必须带时区，用 TIMESTAMPTZ 而非 TIMESTAMP（database §字段规范）
+      ERRORS+=("⛔ [time-type(sql)] $FILE 业务时间用 BIGINT UNSIGNED 毫秒（{动作}_time）；TIMESTAMP 仅限 created_at / updated_at（database.md §4.6）
 $(echo "$TS_HITS" | sed 's/^/   /')")
     fi
 
@@ -177,9 +185,9 @@ $(echo "$VC_HITS" | sed 's/^/   /')")
     fi
 
     # 主键非 BIGINT / UUID
-    PK_HITS=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE '(bigint|bigserial|uuid)' | head -3 || true)
+    PK_HITS=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE 'PRIMARY KEY \(`?id`?(, *`?[a-z_]+`?)?\)|BINARY\(16\)' | head -3 || true)
     if [[ -n "$PK_HITS" ]]; then
-      WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键建议使用 BIGINT / BIGSERIAL / UUID
+      WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键应为 id BINARY(16)（UUIDv7，应用层生成）
 $(echo "$PK_HITS" | sed 's/^/   /')")
     fi
   fi
@@ -190,8 +198,8 @@ $(echo "$PK_HITS" | sed 's/^/   /')")
     check_staged "$FILE" '\buser_id\b' '^\s*//' \
       "user-id(proto)" "Proto 禁止 user_id，统一用 uid"
 
-    check_staged "$FILE" '\bis_deleted\b' '^\s*//' \
-      "soft-delete(proto)" "Proto 禁止 is_deleted，软删除用 deleted_at"
+    check_staged "$FILE" '\b(is_deleted|deleted_at|is_alive)\b' '^\s*//' \
+      "soft-delete(proto)" "本项目不使用软删除：禁止 is_deleted / deleted_at（database.md §4.4）"
 
     # float 金额
     check_staged "$FILE" '\bfloat\b.*(amount|price|fee|balance)|\b(amount|price|fee|balance)\b.*\bfloat\b' '^\s*//' \

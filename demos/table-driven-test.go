@@ -23,8 +23,8 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 			req:  &CreateOrderReq{IdempotencyKey: "idem-1", Amount: decimal.NewFromInt(100)},
 			setupMock: func(repo *MockOrderRepository, lock *MockDistLocker) {
 				repo.EXPECT().GetByIdempotencyKey(gomock.Any(), "idem-1").Return(nil, ErrNotFound)
-				lock.EXPECT().Acquire(gomock.Any(), "order:create:idem-1").Return(func() {}, nil)
-				repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(&Order{ID: 1}, nil)
+				lock.EXPECT().Acquire(gomock.Any(), "lock:trade:order_create:idem-1").Return(func() {}, nil)
+				repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(&Order{ID: "0194f3a2-7c1e-7b52-9d0a-3f6c2e8a1b45"}, nil)
 			},
 			wantErr: nil,
 		},
@@ -41,7 +41,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 			req:  &CreateOrderReq{IdempotencyKey: "idem-2", Amount: decimal.NewFromInt(100)},
 			setupMock: func(repo *MockOrderRepository, lock *MockDistLocker) {
 				repo.EXPECT().GetByIdempotencyKey(gomock.Any(), "idem-2").
-					Return(&Order{ID: 42, IdempotencyKey: "idem-2"}, nil)
+					Return(&Order{ID: "0194f3a2-7c1e-7b52-9d0a-3f6c2e8a1b46", IdempotencyKey: "idem-2"}, nil)
 				// 幂等命中后不应再加锁/写入
 			},
 			wantErr: nil,

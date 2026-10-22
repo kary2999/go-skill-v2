@@ -1,6 +1,6 @@
 #!/bin/bash
 # go-panic-guard · PostToolUse hook
-# 写 .go 文件后扫描裸 panic()，非 main.go / cmd/ 里的 panic 直接阻断并提示修成 xerror
+# 写 .go 文件后扫描裸 panic()，非 main.go / cmd/ 里的 panic 直接阻断并提示改为返回 AppError
 #
 # Claude Code settings.json 配置：
 # "hooks": {
@@ -42,6 +42,6 @@ fi
 echo "⛔ [go-panic-guard] 在 $FILE 中发现裸 panic："
 echo "$MATCHES"
 echo ""
-echo "团队规范：业务代码禁止裸 panic，改用 xerror.New / xerror.Wrap 返回错误。"
+echo "团队规范：业务代码禁止裸 panic，改为返回 *errors.AppError（error-codes.md §5）。"
 echo "只有 main.go 和 cmd/ 下允许 panic。"
 exit 1

@@ -1,0 +1,17 @@
+---
+description: Redis usage — key naming, cache-aside, locks, idempotency
+globs: **/*cache*.go, **/*redis*.go, **/data/**
+alwaysApply: false
+---
+
+# Redis 使用规范（详见 references/redis.md）
+
+- MySQL 是唯一事实源；Redis 只做缓存 / 计数 / 锁 / 幂等第一道防线，**资金正确性不依赖 Redis**
+- Key：`{业务域}:{模块}:{标识}`，全小写、≥ 3 段、**必带 TTL（加 0–20% 随机抖动）**；一律 `naming.RedisKey` 构造（交易对等含大写 / 连字符的值先转小写，否则 panic）
+- Cache-Aside：读先 Redis 后回源；写**先写 MySQL 再删缓存**，删除失败重试 / Kafka 补删
+- `redis.Nil` 是未命中不是错误；Redis 故障时读降级回源 MySQL（须限流），写不因删缓存失败而失败
+- 防穿透（缓存空值）/ 防击穿（`cache/singleflight`）/ 防雪崩（TTL 抖动）
+- 单 Key ≤ 10KB、集合元素 ≤ 5000、单 Key QPS ≤ 5000；禁止 `KEYS` / 大集合 `HGETALL`；批量用 Pipeline
+- 锁：`SET NX PX` + 随机 token + **Lua 校验 token 后释放**；TTL 必设；不是资金正确性的依据
+- 幂等：`idempotency.Middleware`（`X-Idempotency-Key`，Redis 异常时放行）+ MySQL 唯一键兜底
+- 所有调用带超时（读 100–300ms）；金额以字符串存储；日志不记录 value

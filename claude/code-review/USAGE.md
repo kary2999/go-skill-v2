@@ -71,7 +71,7 @@ balance float64
 
 | 场景 | AI 行为 |
 |---|---|
-| AI 自己刚写完一段 .go / .sql / .proto / Dockerfile | 内心自检，违规直接修 |
+| AI 自己刚写完一段 .go / .sql / Dockerfile | 内心自检，违规直接修 |
 | 你粘 ≥10 行代码 + 问"看下 / 这样行吗 / 帮我改改" | 输出完整 P0/P1/P2 报告 |
 | 你说"review 这段 / 审一下 / 检查 / code review" | 同上，完整报告 |
 | 你说"PR 提交前看看 / 上线前自检 / 合入前检查" | 同上 |
@@ -104,8 +104,8 @@ AI 倾向**不触发**——错过比噪音好。你随时能敲 `/review` 主�
 
 func GetBalance(ctx context.Context, uid string) (decimal.Decimal, error) {
     var balance decimal.Decimal
-    if err := db.QueryRow(ctx, "SELECT balance FROM wallets WHERE uid = $1", uid).Scan(&balance); err != nil {
-        return decimal.Zero, xerror.Wrap(err, errno.WalletQueryFailed)
+    if err := db.WithContext(ctx).Raw("SELECT available_balance FROM wallet.balances WHERE uid = ?", uid).Scan(&balance).Error; err != nil {
+        return decimal.Zero, fmt.Errorf("query balance uid=%s: %w", uid, err)
     }
     return balance, nil
 }
@@ -148,7 +148,7 @@ func GetBalance(ctx context.Context, uid string) (decimal.Decimal, error) {
 #### #2 用户字段命名违反 §1.2（conf=85）
 （同上格式...）
 
-#### #3 errors.New 不走 xerror（铁律 #2，conf=92）
+#### #3 errors.New 不走 AppError（铁律 #2，conf=92）
 ...
 
 #### #4 SELECT * 全列查询（铁律 #9，conf=88）

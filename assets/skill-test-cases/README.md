@@ -41,7 +41,7 @@
 | 文件 | 违反铁律 | 期望 AI 指出 |
 |---|---|---|
 | `01_hardcoded_secret.go` | #1 密钥 | 指出硬编码 API Key，建议走 config / env |
-| `02_bare_errors_new.go` | #2 错误码 | 指出裸 `errors.New`，改 `xerror.New(errno.X)` |
+| `02_bare_errors_new.go` | #2 错误码 | 指出裸 `errors.New`，改 `*errors.AppError`（`errcode` 包） |
 | `03_silent_error.go` | #3 丢 error | 指出 `_ = err` 吞错，改为 `fmt.Errorf("ctx: %w", err)` 向上包装 |
 | `04_business_panic.go` | #4 panic | 指出业务代码 panic 会挂整进程 |
 | `05_naked_goroutine.go` | #5 goroutine | 指出无 ctx 的裸 goroutine 会泄漏 |

@@ -1,53 +1,37 @@
 ---
-description: API design — RESTful + gRPC, URLs, response shape, versioning, security
-globs: **/*.proto, **/handler/**, **/service/**, **/server/**
+description: API design — REST + JSON unified envelope (Gin, gin-go-common-lib/response)
+globs: **/handler/**, **/router/**, docs/api/**
 alwaysApply: false
 ---
 
-# API 设计
+# 接口规范（REST + JSON 统一响应体）
 
-## RESTful
-- URL 小写 + `kebab-case`：`/api/v1/trade-orders`
-- 资源复数名词：`/users`、`/orders`
-- 层级关系走路径：`/users/{userId}/orders`
-- 动作用 HTTP Method 表达（**禁止** `POST /api/v1/createOrder`、`GET /getOrderList`）
+## URL 与方法
+- `/api/v1/{resource}[/{id}][/{action}]`；资源复数名词、小写 kebab-case；**禁止**动词接口名（`/getOrderList`）
+- GET 查询（query string）/ POST 创建与状态流转 / PUT 整体替换 / PATCH 局部更新 / DELETE 删除
+- 资金类写接口只提供 `POST` + `X-Idempotency-Key`
 
-### 统一响应
+## 统一响应体（必须经公共库 `response` 输出，禁止 `c.JSON`）
 ```json
-{
-  "code": 0,
-  "message": "success",
-  "data": { ... },
-  "timestamp": 1712649600000,
-  "traceId": "abc123def456"
-}
+{ "code": "0", "msg": "ok", "data": {}, "trace_id": "...", "timestamp": "2026-10-22T08:15:30Z" }
 ```
-- 分页 `{ items, pagination: { page, pageSize, total, totalPages } }`
-- 时间戳 Unix 毫秒
-- 错误码走 `errno` 体系（见 `03-error-codes.mdc`）
-- 每个响应**必须**带 `traceId`（OTel 上下文）
+- `code` 字符串：`"0"` 成功，其余为 `{SERVICE}_{MODULE}_{NNN}`
+- 成功时 `data` 不为 `null`；列表 `{ list, pagination: { page, page_size, total, has_more, next_cursor } }`，空列表 `[]`
+- HTTP 状态码如实：400 参数 / 401 未登录 / 403 无权限 / 404 不存在 / 409 冲突 / 429 限流 / 500 内部 / 502 上游
+- 前端以 `code` 判断业务结果
 
-### HTTP 状态码
-200 / 201 / 204 / 400 / 401 / 403 / 404 / 409 冲突 / 422 业务拒绝 / 429 限流 / 500
+## 字段与类型
+- JSON 一律 `snake_case`
+- 金额 / 数量 / 价格 / 比率 / 主键 / ID：**string**；业务时间：毫秒 `int64`（`*_time`）；枚举：大写下划线字符串；布尔：`true/false`
+- 分页参数 `page`（从 1）/ `page_size`（≤100）/ `cursor`；大数据与深翻页用游标；游标对前端不透明
 
-### 版本
-- 路径版本 `/api/v1/`；破坏性变更才升版本
-- 废弃需 6 个月过渡，提前 3 个月通知
-
-## gRPC
-- package：`clawnova.<service>.<version>`
-- service：`XxxService`；method `VerbNoun`（`CreateOrder`）
-- 请求/响应：`MethodNameRequest` / `MethodNameResponse`
-- 字段 `snake_case`
-- **禁止**删除/重命名字段、改类型/编号；废弃用 `reserved`
+## 请求头
+`Authorization: Bearer`、`X-Trace-Id`、`X-Idempotency-Key`；`X-User-Id` 仅由网关注入，服务不得信任公网客户端传来的值
 
 ## 安全
-- 外部 JWT Bearer，Access Token ≤ 30 分钟
-- 内部 gRPC mTLS + 服务账号（Istio）
-- 敏感操作（提现、改安全设置）需 2FA
-- 限流走 Istio RateLimit，触发 429 + `Retry-After`
-- 敏感字段（手机号/邮箱/身份证）输出脱敏；日志禁止密码/Token/私钥
-- 对外强制 HTTPS / TLS 1.3
+- Token 严禁出现在 URL；敏感接口 HTTPS + `Cache-Control: no-store` + 严格限流 + 审计日志
+- 日志禁止 Token / 密码 / 完整证件号卡号
 
-## 文档
-- OpenAPI 3.0；proto 必须有注释；CHANGELOG 记录变更；废弃标 `Deprecated`。
+## 版本与文档
+- 路径版本 `/api/v1`；破坏性变更才升版本并并行运行
+- 先写接口文档（`docs/api/`，按 `references/api-doc.md` 模板）并评审，再开发

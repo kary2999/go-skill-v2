@@ -40,20 +40,20 @@ team-standards/
 │   ├── cursor-usage.md
 │   ├── glossary.md             # ← 新增：团队 + Go + 云原生 术语表
 │   └── naming-visual.png
-├── demos/                      # ← 新增：10 个轻量代码模板（Cursor/Claude 模糊触发）
-│   ├── kratos-service-min.go
-│   ├── wire-providerset.go
+├── demos/                      # 10 个轻量代码模板（Cursor/Claude 模糊触发）
+│   ├── gin-service-min.go
+│   ├── apperror.go
+│   ├── mysql-migration.sql
+│   ├── mysql-gorm-repo.go
 │   ├── kafka-producer.go
 │   ├── kafka-consumer.go
-│   ├── pg-migration.sql
-│   ├── pg-gorm-repo.go
-│   ├── redis-idempotency.go
-│   ├── errno-xerror.go
+│   ├── outbox-relay.go
+│   ├── redis-cache.go
 │   ├── slog-trace.go
 │   └── table-driven-test.go
 ├── claude/go-team-standards/   # Claude Skill（含 references 软链）
 ├── cursor/
-│   ├── rules/                  # 12 份 .mdc（含 common-lib 偏好 + demo 触发）
+│   ├── rules/                  # 15 份 .mdc（含 Redis / Kafka / 前端规则、common-lib 偏好、demo 触发）
 │   └── .cursorignore.template
 ├── assets/.golangci.yml
 │
@@ -77,16 +77,18 @@ team-standards/
 
 在 Claude Code / Cursor 里用**自然语言**描述需求即可，例如：
 - "帮我写个 kafka 生产者" → 参考 `demos/kafka-producer.go`
-- "给个 redis 幂等示例" → `demos/redis-idempotency.go`
-- "pg 建表模板" → `demos/pg-migration.sql`
-- "新建一个 kratos 服务" → `demos/kratos-service-min.go`
+- "给个 redis 缓存 / 分布式锁示例" → `demos/redis-cache.go`
+- "mysql 建表模板" → `demos/mysql-migration.sql`
+- "新建一个 gin 服务" → `demos/gin-service-min.go`
 
 关键词不必精确匹配。详细触发映射见 `cursor/rules/11-demos.mdc` 和 SKILL.md 的 Demo 路由表。
 
 ## 技术栈前提
 
-所有规范和 demo 假设团队栈 = **Kratos v2** + **Wire DI** + **Buf proto** + **mask-go-common-lib**。  
-**禁止绕过 common-lib 直连底层库**（sarama / go-redis / otel 裸客户端等）—— 详见 SKILL.md 的替换表。
+所有规范和 demo 假设团队栈 = **Go 1.24 + Gin + MySQL 8.4 + Redis + Kafka**，公共库 **gin-go-common-lib**，接口统一 **REST + JSON 统一响应体**（不使用 gRPC / Protobuf），前后端分开维护。  
+**禁止绕过公共库直连底层库**（裸 kafka-go / go-redis / gorm.Open / `c.JSON` 等）—— 详见 SKILL.md 的替换表。
+
+> 本仓库是 v2：规范源为 `kary2999/standards-v2`，更新源为 `kary2999/go-skill-v2`，与旧版 `standards` / `go-skill` 互相独立。
 
 ## 升级规范
 

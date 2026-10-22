@@ -1,5 +1,5 @@
 ---
-description: 写接口文档（按 api-doc-example.md 格式）
+description: 写接口文档（按 api-doc.md 的 REST + 统一响应体规范与模板）
 argument-hint: <接口名 + 用途，如 "POST /api/v1/orders 创建订单">
 ---
 
@@ -7,9 +7,9 @@ argument-hint: <接口名 + 用途，如 "POST /api/v1/orders 创建订单">
 
 ## 步骤
 
-1. **必读**：`~/.claude/skills/go-team-standards/references/api-doc-example.md`
-2. **必读**：`~/.claude/skills/go-team-standards/references/api-design.md`
-3. **必读**：`~/.claude/skills/go-team-standards/references/error-codes.md`
+1. **必读**：`~/.claude/skills/go-team-standards/references/api-doc.md`（规范 + 接口文档模板 + 完整示例）
+2. **必读**：`~/.claude/skills/go-team-standards/references/error-codes.md`
+3. 涉及前端对接：另读 `frontend.md`
 
 ## 接口文档结构（强制）
 
@@ -34,39 +34,44 @@ argument-hint: <接口名 + 用途，如 "POST /api/v1/orders 创建订单">
 | Key | 必需 | 说明 |
 |---|---|---|
 | Authorization | ✓ | Bearer Token |
-| X-Trace-ID | ○ | 客户端可选，服务端会生成 |
+| X-Trace-Id | ○ | 客户端可选，服务端会生成并回传 |
+| X-Idempotency-Key | 创建 / 资金类写接口必填 | 幂等键（UUID），重试复用同一个 |
 
 ### Body
 ```json
 {
   "field_a": "string",
-  "field_b": 100
+  "order_amount": "99.00"
 }
 ```
 
 | 字段 | 类型 | 必需 | 说明 | 取值范围 |
 |---|---|---|---|---|
 | field_a | string | ✓ | ... | 1-64 字符 |
-| field_b | int | ✓ | ... | 1-1e9 |
+| order_amount | string | ✓ | 金额（**string**，不用 number） | > 0，精度 ≤ 8 位 |
+
+> 字段一律 snake_case；金额 / 数量 / 价格 / 主键 / ID 用 string；业务时间用毫秒 int64（`*_time`）。
 
 ## 响应
 
 ### 成功 (HTTP 200)
 ```json
 {
-  "code": 0,
-  "message": "success",
-  "data": { ... }
+  "code": "0",
+  "msg": "ok",
+  "data": { ... },
+  "trace_id": "8c41e0a4-77f2-4d88-9a9d-1f1a9c7df222",
+  "timestamp": "2026-10-22T08:15:30Z"
 }
 ```
 
-### 错误码
+### 错误码（`{SERVICE}_{MODULE}_{NNN}`，HTTP 状态码如实返回）
 | code | HTTP | 含义 | 触发条件 |
 |---|---|---|---|
-| 0 | 200 | 成功 | - |
-| 40001 | 400 | 参数错 | field_a 缺失 |
-| 40901 | 409 | 业务冲突 | 重复幂等键 |
-| 50001 | 500 | 服务内部错 | 下游异常 |
+| COMMON_COMMON_002 | 400 | 参数校验失败 | field_a 缺失（`data.errors[]` 含字段明细） |
+| TRADE_ORDER_001 | 400 | 业务校验失败 | 价格超出允许区间 |
+| COMMON_COMMON_301 | 409 | 状态冲突 / 重复请求 | 重复幂等键 |
+| COMMON_COMMON_501 | 500 | 内部异常 | 下游异常 |
 
 ## 调用示例
 
@@ -87,7 +92,7 @@ curl -X POST 'https://api.xxx.com/api/v1/<path>' \
 
 ## 命名约束
 
-字段名遵守全局统一命名规范（uid / _at / 金额带前缀）。
+字段名遵守全局统一命名规范（uid / `*_time` 毫秒 / 金额带前缀且为 string）。
 
 ## 输出格式
 

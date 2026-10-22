@@ -20,7 +20,7 @@ package biz_test
 import "testing"
 
 func TestOrderIntegration_CreateAndFetch(t *testing.T) {
-    // 真连 PG
+    // 真连 MySQL 8.4
 }
 ```
 
@@ -57,20 +57,22 @@ import (
 func TestOrderRepo_Create(t *testing.T) {
     pool, err := dockertest.NewPool("")
     require.NoError(t, err)
-    resource, err := pool.Run("postgres", "15", []string{
-        "POSTGRES_PASSWORD=secret",
-        "POSTGRES_DB=test",
+    // 测试专用容器与测试专用口令（不是任何真实环境的凭证）
+    resource, err := pool.Run("mysql", "8.4", []string{
+        "MYSQL_ROOT_PASSWORD=secret",
+        "MYSQL_DATABASE=trade",
     })
     require.NoError(t, err)
     t.Cleanup(func() { pool.Purge(resource) })
 
-    dsn := fmt.Sprintf("postgres://postgres:secret@localhost:%s/test?sslmode=disable",
-        resource.GetPort("5432/tcp"))
+    // DSN 与生产一致：utf8mb4、UTC、clientFoundRows
+    dsn := fmt.Sprintf("root:secret@tcp(localhost:%s)/trade?charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true",
+        resource.GetPort("3306/tcp"))
 
     var db *sql.DB
     require.NoError(t, pool.Retry(func() error {
         var e error
-        db, e = sql.Open("postgres", dsn)
+        db, e = sql.Open("mysql", dsn)
         if e != nil {
             return e
         }
@@ -96,7 +98,7 @@ mock.ExpectQuery("SELECT .* FROM orders").WillReturnRows(
     sqlmock.NewRows([]string{"id"}).AddRow(1))
 ```
 
-注意：sqlmock 验证的是 SQL 字符串 + 参数，**不是真 DB 行为**。如果你的 SQL 里有 PG 特定语法（JSONB / CTE），建议用 dockertest。
+注意：sqlmock 验证的是 SQL 字符串 + 参数，**不是真 DB 行为**。以下场景必须用 dockertest 真连 MySQL：乐观锁（`RowsAffected` / `clientFoundRows`）、唯一键冲突（1062）、`CHECK` 约束、`BINARY(16)` 读写、`DECIMAL` 精度、`FOR UPDATE SKIP LOCKED`、分区表。
 
 ## CI 分轨
 
@@ -108,7 +110,7 @@ unit:
 integration:
   script: go test -tags=integration ./...
   services:
-    - postgres:15
+    - mysql:8.4
     - redis:7
 ```
 
