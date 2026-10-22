@@ -202,7 +202,7 @@ TODO[review:<级别>·<规则编号> conf=<分>]: <原> → <推荐>（<一句�
 | 7 | 业务时间毫秒 `_time` | `time.Now()` 直调 / 业务时间非 `BIGINT` 毫秒 / UPDATE 漏写 `update_time` |
 | 8 | 日志 logging + trace | `fmt.Println` / `log.Printf` 当业务日志 |
 | 9 | 禁 `SELECT *` / N+1 | `SELECT \*` / 循环内 `db.Query` / OFFSET 分页 |
-| 10 | 禁外键 / 自增主键 / 软删除 | DDL `FOREIGN KEY` / `AUTO_INCREMENT` / `deleted_at` / GORM `foreignKey` tag |
+| 10 | 禁外键 / 软删除；自增只许 `id`；自增 `id` 不外露 | DDL `FOREIGN KEY` / 非 `id` 列 `AUTO_INCREMENT` / `deleted_at` / GORM `foreignKey` tag / API·Kafka·Redis Key 里出现自增 `id` |
 | 11 | 禁死代码 | 大段 `//` 注释掉的代码 |
 | 12 | 敏感数据禁入日志 | log/test fixture 含 phone/email/id_card |
 | 13 | 外部 IO 必带超时 + ctx | `http.Get(` / `db.Exec(` 不传 ctx |

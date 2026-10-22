@@ -58,7 +58,7 @@ var skills = []Skill{
 		Reference: "error-codes.md", Scope: "conditional",
 	},
 	{
-		ID: "database", Title: "MySQL 设计", Description: "库 / 表命名 / 必备字段（create_time 毫秒 + created_at）/ UUIDv7 BINARY(16) 主键 / 无软删除 / 索引 / 分区 / Migration / 安全",
+		ID: "database", Title: "MySQL 设计", Description: "库 / 表命名 / 必备字段（create_time 毫秒 + created_at）/ 自增 id + UUIDv7 oid / 无软删除 / 索引 / 分区 / Migration / 安全",
 		Triggers: []string{"migrations/**", "**/*.sql"},
 		Reference: "database.md", Scope: "conditional",
 	},
@@ -95,7 +95,7 @@ var skills = []Skill{
 	},
 	{
 		ID: "id-generation", Title: "订单号 / 分布式 ID",
-		Description: "订单号及分布式主键一律 UUIDv7；禁止自增 / 雪花 / 顺序号；idgen 封装 + MySQL BINARY(16) 主键",
+		Description: "每表自增 id（仅库内）+ oid（UUIDv7 业务 ID / 订单号）；禁止雪花 / 顺序号；idgen 封装；引用用 {entity}_oid",
 		Triggers:  []string{"生成订单号 / ID", "定义主键", "**/*.go"},
 		Reference: "id-generation.md", Scope: "conditional",
 	},
@@ -409,8 +409,8 @@ func extractFrontmatterTitle(fp string) string {
 var demos = []Demo{
 	{ID: "gin-service", File: "gin-service-min.go", Title: "Gin 服务骨架", Description: "最小 main.go：logging + middleware + 统一响应 + 幂等 + MySQL/Redis 初始化 + 优雅退出", Keywords: []string{"gin", "新服务", "main", "骨架", "启动", "handler"}},
 	{ID: "apperror", File: "apperror.go", Title: "AppError 错误码", Description: "internal/errcode 定义业务错误码 + biz 返回 + handler FailErr", Keywords: []string{"错误码", "errcode", "apperror", "return error"}},
-	{ID: "mysql-migration", File: "mysql-migration.sql", Title: "MySQL Migration 模板", Description: "goose up/down + UUIDv7 主键 + create_time/update_time + 索引 + COMMENT", Keywords: []string{"建表", "migration", "goose", "schema", "mysql"}},
-	{ID: "mysql-gorm-repo", File: "mysql-gorm-repo.go", Title: "GORM Repo 模式", Description: "ctx 超时 + BINARY(16) + 乐观锁 + 游标分页 + 物理删除 + 1062 处理", Keywords: []string{"gorm", "repo", "crud", "查询", "游标分页", "乐观锁"}},
+	{ID: "mysql-migration", File: "mysql-migration.sql", Title: "MySQL Migration 模板", Description: "goose up/down + 自增 id + UUIDv7 oid + create_time/update_time + 索引 + COMMENT", Keywords: []string{"建表", "migration", "goose", "schema", "mysql"}},
+	{ID: "mysql-gorm-repo", File: "mysql-gorm-repo.go", Title: "GORM Repo 模式", Description: "ctx 超时 + id/oid + 乐观锁 + 游标分页 + 物理删除 + 1062 处理", Keywords: []string{"gorm", "repo", "crud", "查询", "游标分页", "乐观锁"}},
 	{ID: "kafka-producer", File: "kafka-producer.go", Title: "Kafka 生产者", Description: "naming.TopicInProject + 统一信封 + PublishWithHeaders", Keywords: []string{"kafka", "生产者", "publish", "发消息", "topic"}},
 	{ID: "kafka-consumer", File: "kafka-consumer.go", Title: "Kafka 消费者", Description: "去重表同事务 + handler 内重试 + 死信（不依赖返回 error）", Keywords: []string{"kafka", "consumer", "消费", "订阅", "死信"}},
 	{ID: "outbox-relay", File: "outbox-relay.go", Title: "Outbox relay", Description: "SKIP LOCKED 取数 + 保序发送 + 失败重试", Keywords: []string{"outbox", "本地消息表", "relay", "最终一致"}},

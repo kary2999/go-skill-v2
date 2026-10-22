@@ -18,7 +18,7 @@ globs:
 |---|---|---|
 | 技术方案 / RFC / 设计文档 | `references/tech-design-example.md`（订单服务范例） | 10 章：背景 → 目标 → 规范 → 流程 → 应用架构 → 系统架构 → 模块 → 接口 → 数据库 → 异常处理 |
 | 接口文档 / API doc | `references/api-doc.md` + `references/error-codes.md` | REST + 统一响应体、HTTP 状态码、分页、错误码、幂等 |
-| 数据库设计 / 表结构 / schema | `references/database.md` + `references/field-naming.md` | UUIDv7 `BINARY(16)`、`create_time` 毫秒 + `created_at`、无软删除、禁外键、`uid` |
+| 数据库设计 / 表结构 / schema | `references/database.md` + `references/field-naming.md` | 自增 `id` + UUIDv7 `oid`、`create_time` 毫秒 + `created_at`、无软删除、禁外键、`uid` |
 | Redis / 缓存方案 | `references/redis.md` | Key 命名、TTL、Cache-Aside、锁、幂等 |
 | Kafka / 事件设计 | `references/kafka.md` | Topic 命名、消息信封、Outbox、幂等消费、DLQ |
 | 前端方案 / 接口对接 | `references/frontend.md` + `references/api-doc.md` | 契约分工、请求封装、金额 / 时间处理 |
@@ -36,7 +36,7 @@ globs:
 - 金额带业务前缀（`order_amount` / `fee_amount`），**禁裸** `amount`；API 中金额、ID 为 string
 - 业务版本字段必须前缀（`rule_version` / `formula_version`），裸 `version` 保留乐观锁
 - 布尔列必须 `is_` 开头（`TINYINT UNSIGNED`）
-- 主键 `id` UUIDv7 `BINARY(16)`，禁自增
+- 两个 ID：`id` 自增（仅库内）+ `oid` UUIDv7 `CHAR(36)`（业务 ID），引用写 `{entity}_oid`
 
 ## 触发反馈协议（必须）
 
@@ -52,5 +52,5 @@ globs:
 
 - ❌ 看到用户在写 .md 当成"普通问答"回答
 - ❌ "我帮你写一份技术方案" 不读 tech-design-example.md
-- ❌ 写表结构不读 database.md（容易漏 `create_time` / `uid` / UUIDv7 主键）
+- ❌ 写表结构不读 database.md（容易漏 `create_time` / `uid` / `id` + `oid`）
 - ❌ 写接口文档不读 api-doc.md

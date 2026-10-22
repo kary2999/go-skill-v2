@@ -27,7 +27,7 @@ argument-hint: <主题，如 "用户中台 v2 改造">
 - 用户主体字段一律 `uid`，禁 `user_id`
 - 无软删除：禁 `deleted_at` / `is_deleted`；禁 `created_by` / `updated_by`
 - 时间：`create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒，必备），其余业务时间 `{动作}_time` 毫秒，`created_at` / `updated_at` 仅库维护
-- 主键 UUIDv7 `BINARY(16)`，禁自增
+- 两个 ID：`id` 自增（仅库内）+ `oid` UUIDv7 `CHAR(36)`（业务 ID，对外 / 引用用 `oid` / `{entity}_oid`）
 - 写库 + 发消息必须 Outbox
 - 金额必带业务前缀（`order_amount`/`fee_amount`），禁裸 `amount`
 - 业务版本字段必须前缀（`rule_version`/`config_version`）

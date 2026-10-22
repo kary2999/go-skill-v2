@@ -148,8 +148,11 @@ $(echo "$TIME_HITS" | sed 's/^/   /')")
     check_staged "$FILE" '\b(created_by|updated_by)\b' '^\s*--' \
       "audit-by(sql)" "本项目不设 created_by / updated_by（database.md §4.1）"
 
-    check_staged "$FILE" 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^\s*--' \
-      "auto-increment(sql)" "主键用应用层生成的 UUIDv7 BINARY(16)，禁止自增（id-generation.md）"
+    check_staged "$FILE" 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^[0-9]+:\s*--|\bid\b.*(BIGINT|bigint)\s+(UNSIGNED|unsigned)|AUTO_INCREMENT\s*=' \
+      "auto-increment(sql)" "自增只允许 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT（库内主键）；业务 ID 另设 oid CHAR(36) UUIDv7（id-generation.md）"
+
+    check_staged "$FILE" '(^|[^a-z_])oid[`"]?[[:space:]]+(VAR)?BINARY' '^[0-9]+:\s*--' \
+      "oid-type(sql)" "oid 必须是 CHAR(36)（要求肉眼可读），禁止 BINARY / VARBINARY（id-generation.md）"
 
     check_staged "$FILE" '\b(ENUM|BOOLEAN|BOOL)\b\s*[(\s,]' '^\s*--' \
       "enum-bool(sql)" "枚举 / 布尔用 TINYINT UNSIGNED，禁止 ENUM / BOOLEAN（database.md §4.6）"
@@ -184,10 +187,15 @@ $(echo "$TS_HITS" | sed 's/^/   /')")
 $(echo "$VC_HITS" | sed 's/^/   /')")
     fi
 
-    # 主键非 BIGINT / UUID
-    PK_HITS=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE 'PRIMARY KEY \(`?id`?(, *`?[a-z_]+`?)?\)|BINARY\(16\)' | head -3 || true)
+    # CREATE TABLE 缺 oid（纯技术表如去重表可豁免，评审时说明）
+    if grep -qiE 'CREATE\s+TABLE' "$FILE" && ! grep -qiE '\boid\b' "$FILE"; then
+      WARNINGS+=("⚠️  [sql-oid] $FILE 的 CREATE TABLE 缺少 oid CHAR(36)（UUIDv7 业务 ID）及 uk_{表}_oid；无对外身份的纯技术表可豁免（database.md §4.3）")
+    fi
+
+    # 主键应为自增 id（分区表为 id + 分区键）
+    PK_HITS=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE 'PRIMARY KEY \(`?id`?(, *`?[a-z_]+`?)?\)' | head -3 || true)
     if [[ -n "$PK_HITS" ]]; then
-      WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键应为 id BINARY(16)（UUIDv7，应用层生成）
+      WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键应为 id BIGINT UNSIGNED AUTO_INCREMENT（分区表为 (id, create_time)）
 $(echo "$PK_HITS" | sed 's/^/   /')")
     fi
   fi

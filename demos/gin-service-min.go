@@ -94,7 +94,7 @@ func main() {
 	reg := metrics.NewRegistry()
 
 	// MySQL：公共库已带慢查询日志与连接池（单服务上限 ≤ 50，见 database.md §2.3）。
-	// DSN 必带：charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true&timeout=3s&readTimeout=5s&writeTimeout=5s
+	// DSN 必带：charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true&timeout=3s&readTimeout=35s&writeTimeout=5s
 	gdb, err := db.NewMySQL(db.Config{
 		Driver:       "mysql",
 		Source:       os.Getenv("MYSQL_DSN"), // 密钥走环境变量，禁止硬编码

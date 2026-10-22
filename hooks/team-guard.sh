@@ -212,7 +212,8 @@ $(echo "$TW" | sed 's/^/   /')")
     if [[ "$FILE" == *.sql ]]; then
       _check "$FILE" '\buser_id\b' '^\s*--' "user-id(sql)" "禁止 user_id 列，统一用 uid"
       _check "$FILE" '\b(created_by|updated_by)\b' '^\s*--' "audit-by(sql)" "本项目不设 created_by / updated_by（database.md §4.1）"
-      _check "$FILE" 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^\s*--' "auto-increment(sql)" "主键用应用层生成的 UUIDv7 BINARY(16)，禁止自增（id-generation.md）"
+      _check "$FILE" 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^[0-9]+:\s*--|\bid\b.*(BIGINT|bigint)\s+(UNSIGNED|unsigned)|AUTO_INCREMENT\s*=' "auto-increment(sql)" "自增只允许 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT（库内主键）；业务 ID 另设 oid CHAR(36) UUIDv7（id-generation.md）"
+      _check "$FILE" '(^|[^a-z_])oid[`"]?[[:space:]]+(VAR)?BINARY' '^[0-9]+:\s*--' "oid-type(sql)" "oid 必须是 CHAR(36)（要求肉眼可读），禁止 BINARY / VARBINARY（id-generation.md）"
       _check "$FILE" '\b(ENUM|BOOLEAN|BOOL)\b\s*[(\s,]' '^\s*--' "enum-bool(sql)" "枚举 / 布尔用 TINYINT UNSIGNED，禁止 ENUM / BOOLEAN（database.md §4.6）"
       _check "$FILE" '\b(is_deleted|deleted_at|is_alive)\b' '^\s*--' "soft-delete(sql)" "本项目不使用软删除：禁止 is_deleted / deleted_at（database.md §4.4）"
       _check "$FILE" '\b(FLOAT|DOUBLE|REAL)\b.*(amount|price|fee|balance)|(amount|price|fee|balance).*(FLOAT|DOUBLE|REAL)' '^\s*--' \
@@ -229,8 +230,9 @@ $(echo "$TS" | sed 's/^/   /')")
       VC=$(grep -inE '\bVARCHAR\b' "$FILE" | grep -ivE '\bVARCHAR\s*\(' | grep -v '^\s*--' | head -5 || true)
       [[ -n "$VC" ]] && ERRORS+=("⛔ [varchar-len(sql)] $FILE VARCHAR 必须声明长度，如 VARCHAR(255)
 $(echo "$VC" | sed 's/^/   /')")
-      PK=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE 'PRIMARY KEY \(`?id`?(, *`?[a-z_]+`?)?\)|BINARY\(16\)' | head -3 || true)
-      [[ -n "$PK" ]] && WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键应为 id BINARY(16)（UUIDv7，应用层生成）
+      grep -qiE '\boid\b' "$FILE" || WARNINGS+=("⚠️  [sql-oid] $FILE 的 CREATE TABLE 缺少 oid CHAR(36)（UUIDv7 业务 ID）及 uk_{表}_oid；无对外身份的纯技术表可豁免（database.md §4.3）")
+      PK=$(grep -niE 'PRIMARY KEY' "$FILE" | grep -ivE 'PRIMARY KEY \(`?id`?(, *`?[a-z_]+`?)?\)' | head -3 || true)
+      [[ -n "$PK" ]] && WARNINGS+=("⚠️  [sql-pk-type] $FILE 主键应为 id BIGINT UNSIGNED AUTO_INCREMENT（分区表为 (id, create_time)）
 $(echo "$PK" | sed 's/^/   /')")
     fi
 
@@ -318,7 +320,8 @@ $(echo "$CAMEL" | sed 's/^/   /')
   if [[ "$FILE" == *.sql ]]; then
     _post_check '\buser_id\b' '^\s*--' "user-id(sql)" "禁止 user_id 列，统一用 uid"
     _post_check '\b(created_by|updated_by)\b' '^\s*--' "audit-by(sql)" "本项目不设 created_by / updated_by（database.md §4.1）"
-    _post_check 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^\s*--' "auto-increment(sql)" "主键用应用层生成的 UUIDv7 BINARY(16)，禁止自增（id-generation.md）"
+    _post_check 'AUTO_INCREMENT|BIGSERIAL|GENERATED\s+ALWAYS\s+AS\s+IDENTITY' '^[0-9]+:\s*--|\bid\b.*(BIGINT|bigint)\s+(UNSIGNED|unsigned)|AUTO_INCREMENT\s*=' "auto-increment(sql)" "自增只允许 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT（库内主键）；业务 ID 另设 oid CHAR(36) UUIDv7（id-generation.md）"
+    _post_check '(^|[^a-z_])oid[`"]?[[:space:]]+(VAR)?BINARY' '^[0-9]+:\s*--' "oid-type(sql)" "oid 必须是 CHAR(36)（要求肉眼可读），禁止 BINARY / VARBINARY（id-generation.md）"
     _post_check '\b(ENUM|BOOLEAN|BOOL)\b\s*[(\s,]' '^\s*--' "enum-bool(sql)" "枚举 / 布尔用 TINYINT UNSIGNED，禁止 ENUM / BOOLEAN（database.md §4.6）"
     _post_check '\b(is_deleted|deleted_at|is_alive)\b' '^\s*--' "soft-delete(sql)" "本项目不使用软删除：禁止 is_deleted / deleted_at（database.md §4.4）"
     _post_check '\b(FLOAT|DOUBLE|REAL)\b.*(amount|price|fee|balance)|(amount|price|fee|balance).*(FLOAT|DOUBLE|REAL)' '^\s*--' \

@@ -1,13 +1,14 @@
 -- Demo: goose 迁移模板（MySQL 8.4）— migrations/000001_trade_create_orders.sql
 -- 对应 database.md §4.10 / §6：一个文件只改一个库、尽量只放一条 DDL（MySQL DDL 隐式提交，无法回滚半成品）。
 -- 文件命名：{6位序号}_{库}_{描述}.sql（goose 单文件含 Up / Down）。
--- 必备字段：id(BINARY(16) UUIDv7) / create_time / update_time(毫秒) / created_at / updated_at(TIMESTAMP，库维护)
--- 禁止：AUTO_INCREMENT、FOREIGN KEY、deleted_at / 软删除、created_by / updated_by、ENUM / BOOLEAN、FLOAT / DOUBLE、触发器 / 存储过程
+-- 必备字段：id(BIGINT UNSIGNED 自增，库内主键) / oid(CHAR(36) UUIDv7，业务 ID) / create_time / update_time(毫秒) / created_at / updated_at(TIMESTAMP，库维护)
+-- 禁止：非 id 列的 AUTO_INCREMENT、FOREIGN KEY、deleted_at / 软删除、created_by / updated_by、ENUM / BOOLEAN、FLOAT / DOUBLE、触发器 / 存储过程
 
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE `trade`.`orders` (
-    `id`               BINARY(16)       NOT NULL COMMENT '主键 UUIDv7，应用层 idgen 生成',
+    `id`               BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT COMMENT '库内主键，自增，仅本表内部使用（不进 API / Kafka / 其他表）',
+    `oid`              CHAR(36)         NOT NULL COMMENT '业务 ID（订单号），UUIDv7 小写 36 位，应用层 idgen 生成',
 
     -- 多租户必备
     `platform_id`      VARCHAR(32)      NOT NULL COMMENT '平台 ID',
@@ -33,6 +34,7 @@ CREATE TABLE `trade`.`orders` (
     `updated_at`       TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_orders_oid` (`oid`),
     UNIQUE KEY `uk_orders_platform_uid_client_order` (`platform_id`, `uid`, `client_order_id`),
     KEY `idx_orders_platform_uid_ctime` (`platform_id`, `uid`, `create_time` DESC),
     KEY `idx_orders_platform_symbol_status` (`platform_id`, `symbol`, `order_status`),
@@ -46,7 +48,7 @@ CREATE TABLE `trade`.`orders` (
   COMMENT='现货订单表';
 -- +goose StatementEnd
 
--- 大表（> 2000 万行）须按 create_time 分区：分区键必须进入主键与所有唯一键，见 database.md §5.1。
+-- 大表（> 2000 万行）须按 create_time 分区：分区键必须进入主键与所有唯一键（主键改为 (id, create_time)，uk_orders_oid 也要带 create_time），见 database.md §5.1。
 -- 在线加索引示例（不要去掉 ALGORITHM 子句强跑；不支持时改走 gh-ost）：
 --   ALTER TABLE `trade`.`orders` ADD INDEX idx_xxx (...), ALGORITHM=INPLACE, LOCK=NONE;
 

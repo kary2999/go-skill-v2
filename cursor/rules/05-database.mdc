@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## 基线
 - 仅 InnoDB；`utf8mb4` + `utf8mb4_0900_bin`（建表显式写出）；实例时区 UTC；隔离级别 `READ COMMITTED`；严格 `sql_mode`
-- 所有服务经 ProxySQL 接入，连接池单服务 ≤ 50；DSN 必带 `charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true&timeout=3s&readTimeout=5s&writeTimeout=5s`
+- 所有服务经 ProxySQL 接入，连接池单服务 ≤ 50；DSN 必带 `charset=utf8mb4&parseTime=true&loc=UTC&clientFoundRows=true&timeout=3s&readTimeout=35s&writeTimeout=5s`
 
 ## 命名
 - 全 `snake_case` 小写；长度 ≤ 64；禁止保留字（`order` / `user` / `key` / `rank` …），**不要靠反引号规避，改名**
@@ -18,7 +18,8 @@ alwaysApply: false
 
 ## 必备字段（每表）
 ```sql
-`id`          BINARY(16)      NOT NULL COMMENT '主键 UUIDv7，应用层生成',
+`id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '库内主键，自增，仅本表内部使用',
+`oid`         CHAR(36)        NOT NULL COMMENT '业务 ID，UUIDv7 小写 36 位，应用层生成',
 `create_time` BIGINT UNSIGNED NOT NULL COMMENT '创建时间，毫秒时间戳（UTC）',
 `update_time` BIGINT UNSIGNED NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
 `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -27,7 +28,7 @@ alwaysApply: false
 - `create_time` / `update_time` 由应用层写，业务以它们为准；`created_at` / `updated_at` 由库维护，仅运维参考
 - 业务时间点一律 `{动作}_time BIGINT UNSIGNED`（毫秒）；`TIMESTAMP` 仅限 `created_at` / `updated_at`（2038 上限）
 - **不设** `deleted_at` / `created_by` / `updated_by`；**不使用软删除**，允许物理 DELETE（资金类先归档，批量分批 ≤ 1000）
-- **禁止** `FOREIGN KEY`、`AUTO_INCREMENT`、触发器 / 存储过程 / EVENT
+- **禁止** `FOREIGN KEY`、触发器 / 存储过程 / EVENT；自增只允许 `id BIGINT UNSIGNED`（库内主键），业务 ID 用 `oid`
 - 多租户表加 `platform_id VARCHAR(32)` / `uid VARCHAR(64)`，索引前缀含 `platform_id`；用户字段统一 `uid`
 
 ## 字段类型
@@ -42,10 +43,11 @@ alwaysApply: false
 | JSON | `JSON`，仅非核心扩展属性，≤ 64KB，不作主要查询条件 |
 | 业务字段 | 默认 `NOT NULL` + 默认值（除 `TEXT` / `JSON`） |
 
-## 主键 UUIDv7
-- 应用层 `idgen` 生成；`BINARY(16)`（不用 `CHAR(36)`）；不要 `UUID_TO_BIN(x, 1)`
-- 手写 SQL 用 `UUID_TO_BIN(?)` 配 36 位字符串；**不要把 `[]byte` 直接当 GORM 的 `?` 参数**（会展开成多个参数）
-- 业务逻辑不依赖数据库生成的 ID，不读 `LAST_INSERT_ID()`；翻页用 `create_time`，`id` 仅作同毫秒 tie-breaker
+## 主键 `id` 与业务 ID `oid`
+- 每表唯一键 `uk_{表}_oid`；`oid` 由 `idgen` 生成（UUIDv7，**小写** 36 位）；引用其他实体用 `{entity}_oid`（`CHAR(36)`）
+- 自增 `id` 只在本表内部用：不进 API / Kafka / Redis Key，不被其他表引用，不读 `LAST_INSERT_ID()`，不假设连续
+- 翻页用 `create_time`，`id` 仅作同毫秒 tie-breaker；分区表主键为 `(id, create_time)`，`uk_oid` 也要带 `create_time`
+- 1062 看索引名：`uk_*_oid` 才换 `oid` 重试；业务唯一键冲突按幂等处理
 
 ## 索引与查询
 - 逻辑外键字段必须建索引；单表索引 ≤ 8；组合索引最左前缀；范围列放最后

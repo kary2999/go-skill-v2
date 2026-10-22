@@ -98,7 +98,7 @@ mock.ExpectQuery("SELECT .* FROM orders").WillReturnRows(
     sqlmock.NewRows([]string{"id"}).AddRow(1))
 ```
 
-注意：sqlmock 验证的是 SQL 字符串 + 参数，**不是真 DB 行为**。以下场景必须用 dockertest 真连 MySQL：乐观锁（`RowsAffected` / `clientFoundRows`）、唯一键冲突（1062）、`CHECK` 约束、`BINARY(16)` 读写、`DECIMAL` 精度、`FOR UPDATE SKIP LOCKED`、分区表。
+注意：sqlmock 验证的是 SQL 字符串 + 参数，**不是真 DB 行为**。以下场景必须用 dockertest 真连 MySQL：乐观锁（`RowsAffected` / `clientFoundRows`）、唯一键冲突（1062）、`CHECK` 约束、`oid` 唯一索引（含大小写）、`DECIMAL` 精度、`FOR UPDATE SKIP LOCKED`、分区表。
 
 ## CI 分轨
 

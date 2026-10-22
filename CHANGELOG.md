@@ -4,18 +4,21 @@
 
 ---
 
-## [Unreleased] — v2 技术栈切换
+## [2.0.0] — 2026-10-22 · v2 技术栈切换
 
 技术栈由 Kratos + gRPC + PostgreSQL 切换为 **Go + Gin + MySQL 8.4 + Redis + Kafka**；独立仓库 `go-skill-v2` / `standards-v2`，与旧版互不影响。
 
 ### Changed
-- `database.md` 整体改为 MySQL 8.4 规范：UUIDv7 `BINARY(16)` 主键、`create_time` / `update_time`（毫秒）+ `created_at` / `updated_at`（TIMESTAMP）、无软删除、无 `created_by` / `updated_by`、分区 / 在线 DDL / 安全
+- `database.md` 整体改为 MySQL 8.4 规范：每表自增 `id`（`BIGINT UNSIGNED`，库内主键）+ `oid`（`CHAR(36)` UUIDv7，业务 ID）、`create_time` / `update_time`（毫秒）+ `created_at` / `updated_at`（TIMESTAMP）、无软删除、无 `created_by` / `updated_by`、分区 / 在线 DDL / 安全
 - `api-doc.md` 改为 REST + JSON 统一响应体（对齐公共库 `response` / `errors`）；`error-codes.md` 改为 `AppError` + `errcode` 包
 - `go-style.md`（Gin 分层 handler → biz → data）、`field-naming.md`、`id-generation.md`、`naming-logging.md`、`glossary.md`、`tech-design-example.md`（订单服务范例）按新栈重写
 - demos 全部替换：`gin-service-min` / `apperror` / `mysql-migration` / `mysql-gorm-repo` / `kafka-*` / `outbox-relay` / `redis-cache` / `slog-trace`；已在真实 MySQL 8.4.11 / Redis 7.2 上跑过集成测试（见 `demos/README.md`）
 - hooks（team-guard / git-commit-guard / soft-delete-guard / go-panic-guard）与 `scripts/team-standards-check.sh` 改为按新规范检查
 - Cursor 规则 / SKILL.md / slash commands / code-review 技能同步更新
 - 默认规范源改为 `kary2999/standards-v2`，更新源改为 `kary2999/go-skill-v2`；App 图标与页头 logo 换为圆角狮子 logo，并修复 `/icons/` 未内嵌导致页头图标显示为问号
+
+- **ID 方案**：保留自增 `id` 作库内主键，另设 `oid`（UUIDv7，应用层生成，带 `uk_{表}_oid`）作业务 ID；API / Kafka / Redis / 跨表引用只用 `oid`，引用字段由 `{entity}_id` 改为 `{entity}_oid`；自增 `id` 不外露；`oid` 固定 `CHAR(36)`（要求肉眼可读），禁止改为 `BINARY(16)`。分区表主键为 `(id, create_time)`，`uk_oid` 也须带分区键。hooks 改为“自增仅允许 `id BIGINT UNSIGNED`”并提示缺 `oid`；demos 与 Cursor 规则同步（真实 MySQL 8.4.11 上验证了 oid 撞号重试、大小写、分区）
+- DSN `readTimeout` 由 5s 调为 35s（须大于服务端 `max_execution_time`），单次调用时限改由 `context` 控制
 
 ### Added
 - 新规范：`redis.md`、`kafka.md`、`frontend.md`（前端通用约定，不限定框架）

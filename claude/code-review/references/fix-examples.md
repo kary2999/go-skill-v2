@@ -70,10 +70,12 @@ CREATE TABLE orders (
 
 -- ✅
 CREATE TABLE `trade`.`orders` (
-    `id` BINARY(16) NOT NULL COMMENT '主键 UUIDv7，应用层生成',
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '库内主键，自增',
+    `oid` CHAR(36) NOT NULL COMMENT '业务 ID，UUIDv7 小写 36 位，应用层生成',
     `uid` VARCHAR(64) NOT NULL COMMENT '用户 ID',
     `platform_id` VARCHAR(32) NOT NULL COMMENT '平台 ID',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_orders_oid` (`oid`)
 );
 ```
 

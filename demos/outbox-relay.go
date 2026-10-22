@@ -5,7 +5,6 @@ package job
 
 import (
 	"context"
-	"database/sql/driver"
 	"fmt"
 	"time"
 
@@ -23,33 +22,17 @@ const (
 	maxRetries    = 10
 )
 
-// BinaryUUID 把 UUID 存成 BINARY(16)（与 mysql-gorm-repo.go 同一实现，真实项目放公共库）。
-// 不能用 []byte 当 GORM 的 ? 参数：GORM 会把它展开成 16 个参数。
-type BinaryUUID [16]byte
-
-// Value 写库：16 字节。
-func (b BinaryUUID) Value() (driver.Value, error) { return b[:], nil }
-
-// Scan 读库：期望 16 字节。
-func (b *BinaryUUID) Scan(src any) error {
-	raw, ok := src.([]byte)
-	if !ok || len(raw) != 16 {
-		return fmt.Errorf("BinaryUUID: want 16 bytes, got %T len=%d", src, len(raw))
-	}
-	copy(b[:], raw)
-	return nil
-}
-
 // OutboxEvent 对应 trade.outbox_events。
 type OutboxEvent struct {
-	ID          BinaryUUID `gorm:"column:id;primaryKey"`
-	Topic       string     `gorm:"column:topic"`
-	MsgKey      string     `gorm:"column:msg_key"`
-	Payload     []byte     `gorm:"column:payload"` // JSON 列，已是完整信封
-	EventStatus uint8      `gorm:"column:event_status"`
-	RetryCount  uint32     `gorm:"column:retry_count"`
-	CreateTime  int64      `gorm:"column:create_time"`
-	UpdateTime  int64      `gorm:"column:update_time"`
+	ID          uint64 `gorm:"column:id;primaryKey;autoIncrement"` // 库内自增主键，仅 relay 内部用（定位行 / 排序）
+	OID         string `gorm:"column:oid"`                         // UUIDv7，同时作为信封里的 event_id
+	Topic       string `gorm:"column:topic"`
+	MsgKey      string `gorm:"column:msg_key"`
+	Payload     []byte `gorm:"column:payload"` // JSON 列，已是完整信封
+	EventStatus uint8  `gorm:"column:event_status"`
+	RetryCount  uint32 `gorm:"column:retry_count"`
+	CreateTime  int64  `gorm:"column:create_time"`
+	UpdateTime  int64  `gorm:"column:update_time"`
 }
 
 // TableName 库名.表名。
@@ -97,7 +80,7 @@ func (r *Relay) flushOnce(ctx context.Context) error {
 		var events []OutboxEvent
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Where("event_status = ?", statusPending).
-			Order("create_time ASC").Limit(batchSize).Find(&events).Error; err != nil {
+			Order("create_time ASC, id ASC").Limit(batchSize).Find(&events).Error; err != nil {
 			return fmt.Errorf("select outbox: %w", err)
 		}
 		for _, e := range events {

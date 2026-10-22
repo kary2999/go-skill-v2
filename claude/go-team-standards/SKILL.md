@@ -61,7 +61,7 @@ description: |
 在产出的代码 patch 的**最开始位置**（文件首行 / 函数首行 / 改动 hunk 首行）加注释，标明触发了哪个 skill 和具体子规范段：
 
 ```go
-// [skill: go-team-standards · 数据库设计 · 命名规范] 创建 user 表 + UUIDv7 主键
+// [skill: go-team-standards · 数据库设计 · 命名规范] 创建 user 表 + 自增 id 与 UUIDv7 oid
 package data
 
 func CreateUser(...) { ... }
@@ -137,7 +137,7 @@ CREATE TABLE users (...) ;
 **禁止行为**：
 - ❌ 看到用户在写 .md 就当成"普通问答"回答 → **必须**先按文档类型路由读规范
 - ❌ "我帮你写一份技术方案" 不读 tech-design-example.md → 凭通用经验产出 = 与团队范例不符
-- ❌ 写表结构不读 database.md → 主键（UUIDv7 BINARY(16)）/ 时间字段（create_time 毫秒 + created_at）/ 无软删除 / 索引命名八成会破规范
+- ❌ 写表结构不读 database.md → 主键与业务 ID（自增 id + UUIDv7 oid）/ 时间字段（create_time 毫秒 + created_at）/ 无软删除 / 索引命名八成会破规范
 - ❌ 写接口文档不读 api-doc.md → 路径风格 / 统一响应体 / 错误码 / 分页参数全靠模型瞎猜
 - ❌ 写前端请求封装不读 frontend.md → 金额精度、幂等键、错误码处理会出事故
 
@@ -168,7 +168,7 @@ CREATE TABLE users (...) ;
 | 7 | 业务时间 `BIGINT UNSIGNED` 毫秒 UTC（`create_time` / `update_time` 必备，其余 `{动作}_time`）；`TIMESTAMP` 仅限 `created_at` / `updated_at` | 跨时区差一天；`TIMESTAMP` 有 2038 上限 |
 | 8 | 日志用公共库 `logging`（slog），字段 snake_case，带 `trace_id` | 非结构化日志查不了 |
 | 9 | SQL 禁 `SELECT *` / N+1；分页用游标 | 加字段破坏协议 / 慢 |
-| 10 | 禁外键、禁自增主键、禁软删除；主键 UUIDv7 `BINARY(16)` 应用层生成 | 外键阻塞分库分表 / DDL；自增不可跨库唯一 |
+| 10 | 禁外键、禁软删除；每表自增 `id`（仅库内）+ `oid`（UUIDv7，应用层生成，对外 / 跨表引用） | 外键阻塞分库分表 / DDL；自增 `id` 不可跨库唯一且暴露业务量，所以不出表 |
 | 11 | 禁注释掉的死代码 | Git 历史已记录 |
 | 12 | 敏感数据禁入 prompt / 日志 / 测试 | GDPR / 合规事故 |
 | **13** | **所有外部 IO（HTTP / DB / MQ / Redis）必带超时 + trace 传递** | 无超时 = 慢调用穿透 / trace 断链查不到 |
@@ -194,7 +194,7 @@ CREATE TABLE users (...) ;
 ❌ Redis key 手拼 / 大写 / 少于 3 段 / 无 TTL → 必须 `naming.RedisKey(biz, module, id)`，全小写，例 `wallet:balance:p001:usr_88001`
 ❌ DB 字段用禁用别名：`user_id` / `userId` / `tenant_id` / `member_id` → 必须 `uid` / `platform_id` / `org_id`
 ❌ 时间字段：缺 `create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒）或缺 `created_at` / `updated_at`（`TIMESTAMP`）；用 `gmt_create` / `ctime`；业务时间用 `xxx_at` 或 `DATETIME` / `TIMESTAMP` → 必须 `{动作}_time` `BIGINT UNSIGNED` 毫秒
-❌ 软删除（`is_deleted` / `deleted_at`）、`created_by` / `updated_by`、`AUTO_INCREMENT`、`FOREIGN KEY`、`ENUM` / `BOOLEAN` / `FLOAT` / `DOUBLE`、触发器 / 存储过程
+❌ 软删除（`is_deleted` / `deleted_at`）、`created_by` / `updated_by`、非 `id` 列的 `AUTO_INCREMENT`、`FOREIGN KEY`、`ENUM` / `BOOLEAN` / `FLOAT` / `DOUBLE`、触发器 / 存储过程
 ❌ 布尔字段不带 `is_` / `has_` / `can_` 前缀（`enabled` / `active`）→ 必须 `is_enabled` / `is_active`（类型 `TINYINT UNSIGNED`）
 ❌ 业务版本字段裸 `version` → 必须 `rule_version` / `formula_version` / `config_version` / `schema_version`（裸 `version` 永远是乐观锁语义）
 ❌ 金额字段裸 `amount` → 必须 `<业务前缀>_amount`（`order_amount` / `fee_amount`）；类型 `DECIMAL(38,18)` / `DECIMAL(28,8)`；API 中为 string
@@ -214,7 +214,8 @@ CREATE TABLE users (...) ;
 ```sql
 -- [skill: go-team-standards · 字段命名 · 数据库设计] users 表
 CREATE TABLE `auth`.`users` (
-    `id`          BINARY(16)       NOT NULL COMMENT '主键 UUIDv7，应用层生成',   -- ✅ id-generation.md
+    `id`          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT COMMENT '库内主键，自增，不对外',  -- ✅ id-generation.md
+    `oid`         CHAR(36)         NOT NULL COMMENT '业务 ID，UUIDv7 小写 36 位，应用层生成',   -- ✅ 对外 / 引用用 oid
     `uid`         VARCHAR(64)      NOT NULL COMMENT '用户 ID',                    -- ✅ §1.2 用 uid 不用 user_id
     `platform_id` VARCHAR(32)      NOT NULL COMMENT '平台 ID',                    -- ✅ 多租户三件套
     `is_active`   TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1=是 2=否',       -- ✅ 布尔 is_ 前缀 + TINYINT

@@ -17,7 +17,6 @@ import (
 	"gin-go-common-lib/naming"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -102,8 +101,8 @@ func (c *FillConsumer) process(ctx context.Context, msg mq.Message) error {
 		// 1) 去重：唯一键 (consumer_group, event_id)。1062 说明已处理过，视为成功。
 		now := time.Now().UnixMilli()
 		err := tx.Exec(
-			"INSERT INTO trade.consumed_events (id, consumer_group, event_id, create_time, update_time) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?)",
-			newID(), c.group, env.EventID, now, now,
+			"INSERT INTO trade.consumed_events (consumer_group, event_id, create_time, update_time) VALUES (?, ?, ?, ?)", // id 自增由库生成；去重表是纯技术表，无 oid
+			c.group, env.EventID, now, now,
 		).Error
 		if err != nil {
 			var me *mysql.MySQLError
@@ -116,15 +115,4 @@ func (c *FillConsumer) process(ctx context.Context, msg mq.Message) error {
 		// 3) 同事务写 outbox_events，由 relay 发布 order_status_updated
 		return nil
 	})
-}
-
-// newID 生成 UUIDv7 的 36 位字符串，配合 SQL 里的 UUID_TO_BIN(?) 写入 BINARY(16)。
-// 注意：不要把 []byte 直接当 GORM 的 ? 参数传——GORM 会把它展开成 16 个参数，报 1136 列数不匹配（已在 MySQL 8.4 上实测）。
-// 真实项目统一走公共库 idgen，禁止业务代码直接调用 uuid.NewV7。
-func newID() string {
-	id, err := uuid.NewV7()
-	if err != nil {
-		panic(err) // demo 简化；业务代码必须返回 error，禁止 panic
-	}
-	return id.String()
 }

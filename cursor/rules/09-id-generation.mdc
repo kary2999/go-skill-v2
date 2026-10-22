@@ -1,25 +1,35 @@
 ---
-description: Order ID / distributed primary key must use UUIDv7 stored as BINARY(16) (via common-lib idgen)
+description: Every table has auto-increment id (internal PK) plus oid CHAR(36) UUIDv7 (business ID); generated via common-lib idgen
 globs: **/*.go, migrations/**, **/*.sql
 alwaysApply: false
 ---
 
 # 订单号 / 分布式 ID 规范
 
-## 核心
-- 订单号及所有分布式主键 **一律 UUIDv7**（RFC 9562，时间有序，48 位毫秒时间戳约 8920 年才耗尽）
+## 核心：每表两个 ID
+- `id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`：**库内物理主键**，数据库生成，只在本表内部用（聚簇索引、同表排序 tie-breaker）
+- `oid CHAR(36) NOT NULL` + `UNIQUE KEY uk_{表}_oid`：**业务 ID（订单号）**，UUIDv7 小写 36 位，**应用层**生成，写入前已知
+- API / Kafka / Redis Key / 日志 / 跨表跨服务引用，**一律用 `oid`**；引用别的实体写 `{entity}_oid`（`order_oid`），不要叫 `{entity}_id`
 - Go 用 `github.com/google/uuid` 的 `NewV7()`，**封装到公共库 `util/idgen`**，业务代码禁止裸调用
-- MySQL 主键列 `BINARY(16)`（不用 `CHAR(36)`），ID 由**应用层生成**；表内主键叫 `id`，引用时叫 `{entity}_id`，API / Kafka 中为 36 位字符串
 - ⚠️ 公共库 `util/idgen` 目前只有 UUIDv4，须先补 UUIDv7 才能落地
 
-## 禁止
-- ❌ 数据库自增（`AUTO_INCREMENT`）
+## `id`（自增）的禁区
+- ❌ 出现在 API 响应、Kafka 消息、Redis Key、前端
+- ❌ 被其他表 / 服务引用为逻辑外键；当订单号 / 幂等键
+- ❌ 业务读取 `LAST_INSERT_ID()`；假设连续（回滚 / 失败会留空洞）；跨库 / 跨分片唯一
+- ❌ 用 `INT` 自增（必须 `BIGINT UNSIGNED`）；非 `id` 列使用 `AUTO_INCREMENT`
+
+## 禁止的发号方式
 - ❌ 雪花算法 / 自研发号器（41 位时间戳约 69.7 年耗尽、依赖时钟与 worker-id、63 位超出 JS 安全整数）
 - ❌ `order_no` 顺序号 / 日期拼计数器
-- ❌ UUIDv4（无序，作主键写放大）、UUIDv1（含 MAC）
-- ❌ `UUID_TO_BIN(x, 1)` 的 swap_flag（会破坏 UUIDv7 顺序）
+- ❌ UUIDv4（无序）、UUIDv1（含 MAC）
+
+## `oid` 细则
+- 必须**小写**再写入、再查询（库默认 `utf8mb4_0900_bin` 区分大小写；已实测大写 `oid` 能绕过唯一索引写入重复行）
+- 类型固定 `CHAR(36)`（要求肉眼可读）；**禁止**改成 `BINARY(16)` / `VARBINARY` 等二进制形式，任何表都不例外；查询直接传字符串
+- 内存里大量暂存订单时用 `uuid.UUID`（`[16]byte`，16 字节），不要存 36 字符 `string`（实测约 64 字节）
 
 ## 撞号与业务唯一性
-- INSERT 命中主键冲突（1062）→ 重新生成并重试 ≤ 3 次
-- 业务幂等靠 `idempotency_key` / `client_order_id` 等业务唯一键，不靠 ID 唯一性
+- INSERT 命中 1062 → **看错误信息里的索引名**：命中 `uk_{表}_oid` 才重新生成 `oid` 重试（≤ 3 次）；命中业务唯一键是幂等重复，不得换 `oid` 重试
+- 业务幂等靠 `idempotency_key` / `client_order_id` 等业务唯一键，不靠 `oid` / `id`
 - 需要人类可读订单号时，另加 `order_ref` 展示字段，不作主键、不参与关联

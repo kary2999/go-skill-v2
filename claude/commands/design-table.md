@@ -18,7 +18,8 @@ argument-hint: <表名 + 业务说明，如 "orders 订单表，含币种、价�
 ### 必备字段（每张表）
 
 ```sql
-`id`          BINARY(16)       NOT NULL COMMENT '主键 UUIDv7，应用层生成',
+`id`          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT COMMENT '库内主键，自增，仅本表内部使用',
+`oid`         CHAR(36)         NOT NULL COMMENT '业务 ID，UUIDv7 小写 36 位，应用层生成',
 `platform_id` VARCHAR(32)      NOT NULL COMMENT '平台 ID',     -- 多租户
 `uid`         VARCHAR(64)      NOT NULL COMMENT '用户 ID',     -- 用户主体（不是 user_id）
 -- ... 业务字段 ...
@@ -27,10 +28,11 @@ argument-hint: <表名 + 业务说明，如 "orders 订单表，含币种、价�
 `update_time` BIGINT UNSIGNED  NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
 `created_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 `updated_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-PRIMARY KEY (`id`)
+PRIMARY KEY (`id`),
+UNIQUE KEY `uk_{表}_oid` (`oid`)
 ```
 
-**不要**加：`deleted_at`（无软删除）、`created_by` / `updated_by`、`AUTO_INCREMENT`、`FOREIGN KEY`。
+**不要**加：`deleted_at`（无软删除）、`created_by` / `updated_by`、`FOREIGN KEY`；自增只给 `id`。建表时同时加 `UNIQUE KEY uk_{表}_oid (oid)`；引用其他实体用 `{entity}_oid CHAR(36)`。
 
 ### 命名与类型约束
 
