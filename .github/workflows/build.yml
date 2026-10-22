@@ -27,7 +27,7 @@ jobs:
           cache: true
 
       - name: 单元测试
-        run: go test ./...
+        run: go test .
 
       - name: 构建 Team Standards.app（Universal Binary）
         run: bash build-mac-app.sh
