@@ -13,14 +13,14 @@
 # 前置：
 #   - gh CLI 已登录 (gh auth login)
 
-#   - remote origin = git@github.com:kary2999/go-skill.git
+#   - remote origin = git@github.com:kary2999/go-skill-v2.git
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 VERSION=$(cat VERSION | tr -d '[:space:]')
 TAG="v${VERSION}"
-GITHUB_REPO="kary2999/go-skill"
+GITHUB_REPO="kary2999/go-skill-v2"
 
 echo "→ 准备发布 ${TAG}"
 echo ""
@@ -93,7 +93,7 @@ echo ""
 echo "============================================================"
 echo "✅ 发布完成 ${TAG}"
 echo "   Release: https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
-echo "   Pages:   https://kary2999.github.io/go-skill/"
+echo "   Pages:   https://kary2999.github.io/go-skill-v2/"
 echo "============================================================"
 echo ""
 echo "GitHub Actions 将自动部署最新版到 Pages（约 1 分钟）。"

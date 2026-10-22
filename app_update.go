@@ -30,7 +30,7 @@ import (
 // ---------- 配置存储 ----------
 
 type AppUpdateConfig struct {
-	ReleaseProject   string    `json:"release_project"`    // "kary2999/go-skill"
+	ReleaseProject   string    `json:"release_project"`    // "kary2999/go-skill-v2"
 	LastCheckedAt    time.Time `json:"last_checked_at"`
 	LastSeenVersion  string    `json:"last_seen_version"`  // 上次拉到的 latest tag（带 v 前缀）
 	SkippedVersions  []string  `json:"skipped_versions"`   // 用户点过"跳过此版本"的 tag
@@ -38,7 +38,7 @@ type AppUpdateConfig struct {
 }
 
 const (
-	DefaultReleaseProject = "kary2999/go-skill"
+	DefaultReleaseProject = "kary2999/go-skill-v2"
 )
 
 func appUpdateConfigPath() (string, error) {

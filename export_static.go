@@ -267,7 +267,7 @@ func buildInstallScript(payload map[string]any) ([]byte, error) {
 	var sb strings.Builder
 	sb.WriteString(`#!/bin/sh
 # GoSkill 团队规范一键安装（由构建流程自动生成，勿手改）
-# 用法：curl -fsSL https://kary2999.github.io/go-skill/install.sh | sh
+# 用法：curl -fsSL https://kary2999.github.io/go-skill-v2/install.sh | sh
 set -e
 echo "→ 安装 GoSkill 团队规范到 ~/.claude + ~/.cursor + ~/.codex"
 rm -rf "$HOME/.claude/skills/go-team-standards" "$HOME/.codex/skills/go-team-standards"
