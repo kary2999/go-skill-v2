@@ -114,12 +114,13 @@ code {
   border-bottom: 0.5px solid var(--separator);
   margin-bottom: 10px;
 }
+.logo-icon img { width: 100%; height: 100%; display: block; }
 .logo-icon {
   width: 30px; height: 30px;
-  background: linear-gradient(135deg, var(--sys-blue), var(--sys-purple));
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; line-height: 1;
+  overflow: hidden;
   color: #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(255,255,255,0.2) inset;
 }

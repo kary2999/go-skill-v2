@@ -64,8 +64,12 @@ cat > "$BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-# 生成 App 图标：🦕 恐龙 logo，青蓝渐变背景
+# 生成 App 图标
 ICON_SRC="/tmp/ts-icon.png"
+# 优先使用仓库内置的圆角 logo（icon/AppIcon-1024.png）；缺失时回退到下面的脚本生成
+if [[ -f "icon/AppIcon-1024.png" ]]; then
+  cp "icon/AppIcon-1024.png" "$ICON_SRC"
+else
 python3 - <<'PY' > /dev/null 2>&1 || true
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -95,6 +99,7 @@ except Exception as e:
     import sys
     sys.stderr.write(f"icon gen failed: {e}\n")
 PY
+fi
 
 if [[ -f "$ICON_SRC" ]]; then
   ICONSET="/tmp/TeamStandards.iconset"
