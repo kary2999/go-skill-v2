@@ -4,6 +4,12 @@
 
 ---
 
+## [2.0.1] — 2026-10-22
+
+### Fixed
+- 规范同步改用独立配置文件 `standards-sync-v2.json`：此前与旧版共用 `standards-sync.json`，旧版保存的 `standards.git` 地址会盖住 v2 默认的 `standards-v2`，界面一直显示旧仓库；现在不读也不改旧版文件（已加回归测试）
+- `standards-v2` / `go-skill-v2` 改为公开仓库，规范同步与检查更新不再因匿名访问私有仓库而 404
+
 ## [2.0.0] — 2026-10-22 · v2 技术栈切换
 
 技术栈由 Kratos + gRPC + PostgreSQL 切换为 **Go + Gin + MySQL 8.4 + Redis + Kafka**；独立仓库 `go-skill-v2` / `standards-v2`，与旧版互不影响。
