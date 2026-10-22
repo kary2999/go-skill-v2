@@ -6,7 +6,9 @@
 //   - 落盘到 ~/.claude/skills/go-team-standards/references/ + ~/.cursor/skills-cursor/.../references/
 //   - 离线兼容：检查/拉取失败不阻断 App 启动，回退到内嵌
 //
-// 配置：~/Library/Application Support/TeamStandards/standards-sync.json
+// 配置：~/Library/Application Support/TeamStandards/standards-sync-v2.json
+// （v2 单独一个文件，不读也不写旧版 App 的 standards-sync.json，否则旧版保存的 standards.git 地址会盖住 v2 默认值，
+//  而 v2 改地址又会让旧版 App 也去拉 v2 规范）
 // （mode 0600，含 repo_url / project_id / last_synced_sha）
 
 package main
@@ -41,6 +43,9 @@ type StandardsSyncConfig struct {
 	LastCheckError string    `json:"last_check_error"` // 上次检查失败原因
 }
 
+// standardsSyncConfigFile v2 的规范同步配置文件名；旧版用的是 standards-sync.json。
+const standardsSyncConfigFile = "standards-sync-v2.json"
+
 func standardsSyncConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -50,7 +55,7 @@ func standardsSyncConfigPath() (string, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "standards-sync.json"), nil
+	return filepath.Join(dir, standardsSyncConfigFile), nil
 }
 
 func loadStandardsSyncConfig() (*StandardsSyncConfig, error) {
