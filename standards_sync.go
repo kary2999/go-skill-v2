@@ -590,7 +590,7 @@ func handleStandardsSyncPull(w http.ResponseWriter, r *http.Request) {
 // 默认团队规范仓（公开 readonly mirror）
 // 用户首次启动 App 时会自动写入此 URL，省去手动配置。
 // 想改成自己的 mirror，去 App 里「⚡ 安装 → 更新与同步 → ☁️ 规范云端同步 → ⚙️ 配置」改即可。
-const DefaultStandardsRepoURL = "https://github.com/kary2999/standards.git"
+const DefaultStandardsRepoURL = "https://github.com/kary2999/standards-v2.git"
 const DefaultStandardsBranch = "main"
 
 // ---------- 后台定时检查（每小时一次） ----------
