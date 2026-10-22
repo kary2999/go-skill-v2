@@ -36,6 +36,9 @@ var appCSS []byte
 //go:embed all:web/vendor
 var webVendor embed.FS
 
+//go:embed all:web/icons
+var webIcons embed.FS
+
 // newMux 组装全部 HTTP 路由。main() 和静态导出模式（export_static.go）共用。
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
@@ -61,6 +64,11 @@ func newMux() *http.ServeMux {
 		log.Fatalf("web/vendor embed: %v", err)
 	}
 	mux.Handle("GET /vendor/", http.StripPrefix("/vendor/", http.FileServerFS(vendorSub)))
+	iconsSub, err := fs.Sub(webIcons, "web/icons")
+	if err != nil {
+		log.Fatalf("web/icons embed: %v", err)
+	}
+	mux.Handle("GET /icons/", http.StripPrefix("/icons/", http.FileServerFS(iconsSub)))
 
 	// 所有 /api/* 端点用 logMiddleware 包一层，自动记录 HTTP 日志
 	api := func(pattern string, h http.HandlerFunc) {
