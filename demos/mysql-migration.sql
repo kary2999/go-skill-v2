@@ -1,7 +1,7 @@
 -- Demo: goose 迁移模板（MySQL 8.4）— migrations/000001_trade_create_orders.sql
 -- 对应 database.md §4.10 / §6：一个文件只改一个库、尽量只放一条 DDL（MySQL DDL 隐式提交，无法回滚半成品）。
 -- 文件命名：{6位序号}_{库}_{描述}.sql（goose 单文件含 Up / Down）。
--- 必备字段：id(BIGINT UNSIGNED 自增，库内主键) / oid(CHAR(36) UUIDv7，业务 ID) / create_time / update_time(毫秒) / created_at / updated_at(TIMESTAMP，库维护)
+-- 必备字段：id(BIGINT UNSIGNED 自增，库内主键) / oid(CHAR(36) UUIDv7，业务 ID) / create_time / update_time(毫秒) / created_at / updated_at(DATETIME(6)，库维护)
 -- 禁止：非 id 列的 AUTO_INCREMENT、FOREIGN KEY、deleted_at / 软删除、created_by / updated_by、ENUM / BOOLEAN、FLOAT / DOUBLE、触发器 / 存储过程
 
 -- +goose Up
@@ -30,8 +30,8 @@ CREATE TABLE `trade`.`orders` (
     -- 必备时间字段
     `create_time`      BIGINT UNSIGNED  NOT NULL COMMENT '创建时间，毫秒时间戳（UTC），应用层写入',
     `update_time`      BIGINT UNSIGNED  NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），应用层每次更新必写',
-    `created_at`       TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`       TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `created_at`       DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+    `updated_at`       DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间',
 
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_orders_oid` (`oid`),

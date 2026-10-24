@@ -4,6 +4,12 @@
 
 ---
 
+## [Unreleased]
+
+### Changed
+- `created_at` / `updated_at` 由 `TIMESTAMP` 改为 `DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6)`（`updated_at` 加 `ON UPDATE CURRENT_TIMESTAMP(6)`）；全库禁用 `TIMESTAMP`；写明 `DATETIME` 不带时区、会话不得 `SET time_zone`，`DEFAULT` / `ON UPDATE` 精度须与列一致。hooks 新增 `timestamp-type` / `at-type` / `ct-precision` 检查，demos、Cursor 规则、SKILL.md、commands、code-review 示例同步（MySQL 8.4.11 实测）
+- `dev-dna` 默认档案模板改为新栈（Gin / MySQL 8.4 / `AppError` + `errcode` / `id` + `oid` / `DATETIME(6)`），去掉 Kratos / Wire / PostgreSQL / xerror 内容
+
 ## [2.0.1] — 2026-10-22
 
 ### Fixed

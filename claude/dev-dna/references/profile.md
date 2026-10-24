@@ -1,7 +1,7 @@
 ---
 title: "我的开发档案"
-version: "1.0.0"
-last_modified: "2026-04-27"
+version: "2.0.0"
+last_modified: "2026-10-24"
 ---
 
 # 🧬 我的开发档案（dev-dna profile）
@@ -14,7 +14,7 @@ last_modified: "2026-04-27"
 ## 1. 基本信息
 
 - **角色**：（如：Go 后端工程师 / 微服务架构师 / Tech Lead）___
-- **主栈**：（如：Go 1.22 · Kratos v2 · Wire · Buf · PostgreSQL · Kafka · Redis）___
+- **主栈**：（如：Go 1.24 · Gin · GORM · MySQL 8.4 · Redis · Kafka）___
 - **次栈**：（次要语言 / 框架，如：TypeScript · React）___
 - **团队**：___
 - **业务领域**：___（如：交易系统 / 数据中台 / 风控）
@@ -23,12 +23,12 @@ last_modified: "2026-04-27"
 
 > 描述你**主动选择**的风格。AI 应该按此产出代码。
 
-- **错误处理**：必须包装 + 走 xerror.New(errno.X)；禁裸 errors.New
+- **错误处理**：必须包装（`fmt.Errorf("ctx: %w", err)`）+ 业务错误走 `AppError` + `internal/errcode`；禁裸 errors.New
 - **命名**：snake_case for SQL columns / camelCase for Go vars / kebab-case for k8s resources
 - **测试**：表驱动 + mockgen，禁手写 mock
 - **注释**：godoc 风格（`// 函数名 does ...`）+ 中文业务注释
-- **代码组织**：interface 先行；Wire 注入；usecase / data / service 三层
-- **金额**：必须 decimal.Decimal；DB DECIMAL(28,8)
+- **代码组织**：interface 先行；构造函数手动注入；handler / biz / data 三层
+- **金额**：必须 decimal.Decimal；DB 加密货币 DECIMAL(38,18)、法币 DECIMAL(28,8)；JSON 用字符串
 - **日志**：slog + snake_case key + trace_id
 
 （其他自由补充：）
@@ -53,22 +53,21 @@ last_modified: "2026-04-27"
 
 > 用户说"按我习惯实现 X"时，AI 直接照这些套路产出，不要再问。
 
-### 4.1 新建一个 Kratos 微服务
-- cmd/main.go 走 Wire 装配
-- proto 定义在 api/<biz>/v1/<biz>.proto
-- biz / data / service 三层
-- 错误码在 internal/errno/<biz>.go
+### 4.1 新建一个 Gin 微服务
+- cmd/<svc>/main.go 手动装配（构造函数注入），中间件走 `middleware.Default`
+- handler / biz / data 三层；handler 只做解析与校验，业务规则在 biz
+- 错误码在 internal/errcode/<biz>.go，先注册再使用
 
 ### 4.2 新增数据表
-- 先写 migration 文件 `migrations/YYYYMMDD_NN_<action>.sql`
-- 主键 BIGSERIAL；`id`、`created_at`、`updated_at`、`deleted_at` 标配
-- 时间字段 TIMESTAMPTZ(6)
-- 禁外键
+- 先写 goose migration 文件 `migrations/{6位序号}_{库}_{描述}.sql`，一个文件只放一条 DDL
+- 两个 ID：`id BIGINT UNSIGNED AUTO_INCREMENT`（库内主键，不外露）+ `oid CHAR(36)`（UUIDv7 业务 ID，带 `uk_{表}_oid`），引用写 `{entity}_oid`
+- 时间：`create_time` / `update_time`（BIGINT 毫秒，应用层写）+ `created_at` / `updated_at`（`DATETIME(6)`，库维护）；全库禁用 `TIMESTAMP`
+- 无软删除（不设 `deleted_at`）、无 `created_by` / `updated_by`；禁外键
 
 ### 4.3 新增 HTTP 接口
-- 先在 .proto 加 RPC + http binding
-- handler 走 service 层转 usecase
-- 错误统一返回 xerror，前端按 errno 国际化
+- 先写接口文档（REST + JSON 统一响应体 `{code,msg,data,trace_id,timestamp}`），契约确认后再写代码
+- handler 调 biz，错误统一 `AppError`，前端按 `code` 国际化
+- 写操作带 `X-Idempotency-Key`；金额、ID 一律 string
 
 （自由补充更多模式：）
 ### 4.x ___
@@ -108,5 +107,5 @@ last_modified: "2026-04-27"
 ## ✏️ 编辑指南
 
 - 每次重大变化（换栈、换团队、风格演进）→ 更新顶部 `last_modified` + 提 `version`
-- 内容尽量**具体可执行**（"我喜欢 xerror.New(errno.X)"），别太抽象（"我喜欢好的错误处理"）
+- 内容尽量**具体可执行**（"我喜欢用 AppError + errcode 返回业务错误"），别太抽象（"我喜欢好的错误处理"）
 - 跨电脑迁移：**整个 `~/.claude/skills/dev-dna/` 目录 tar 走**就行

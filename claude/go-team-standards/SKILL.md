@@ -165,7 +165,7 @@ CREATE TABLE users (...) ;
 | 4 | 业务代码禁 `panic`，仅 `init()` / 启动用 | panic 会挂整个进程 |
 | 5 | goroutine 必带 `context` / `errgroup` | 裸 goroutine 泄漏 → OOM |
 | 6 | 金额用 `decimal.Decimal`，禁 `float64` | 0.1+0.2≠0.3，账务对不平 |
-| 7 | 业务时间 `BIGINT UNSIGNED` 毫秒 UTC（`create_time` / `update_time` 必备，其余 `{动作}_time`）；`TIMESTAMP` 仅限 `created_at` / `updated_at` | 跨时区差一天；`TIMESTAMP` 有 2038 上限 |
+| 7 | 业务时间 `BIGINT UNSIGNED` 毫秒 UTC（`create_time` / `update_time` 必备，其余 `{动作}_time`）；库维护的 `created_at` / `updated_at` 用 `DATETIME(6)`，全库禁用 `TIMESTAMP` | 跨时区差一天；`TIMESTAMP` 有 2038 上限；`DATETIME` 不带时区，须统一 UTC |
 | 8 | 日志用公共库 `logging`（slog），字段 snake_case，带 `trace_id` | 非结构化日志查不了 |
 | 9 | SQL 禁 `SELECT *` / N+1；分页用游标 | 加字段破坏协议 / 慢 |
 | 10 | 禁外键、禁软删除；每表自增 `id`（仅库内）+ `oid`（UUIDv7，应用层生成，对外 / 跨表引用） | 外键阻塞分库分表 / DDL；自增 `id` 不可跨库唯一且暴露业务量，所以不出表 |
@@ -193,7 +193,7 @@ CREATE TABLE users (...) ;
 ❌ Kafka topic 手拼字符串 / 驼峰 / 点分隔 / 无环境前缀 → 必须 `naming.TopicInProject(env, service, biz, action)`，只含小写字母数字下划线，例 `prod_order_pay_status_updated`
 ❌ Redis key 手拼 / 大写 / 少于 3 段 / 无 TTL → 必须 `naming.RedisKey(biz, module, id)`，全小写，例 `wallet:balance:p001:usr_88001`
 ❌ DB 字段用禁用别名：`user_id` / `userId` / `tenant_id` / `member_id` → 必须 `uid` / `platform_id` / `org_id`
-❌ 时间字段：缺 `create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒）或缺 `created_at` / `updated_at`（`TIMESTAMP`）；用 `gmt_create` / `ctime`；业务时间用 `xxx_at` 或 `DATETIME` / `TIMESTAMP` → 必须 `{动作}_time` `BIGINT UNSIGNED` 毫秒
+❌ 时间字段：缺 `create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒）或缺 `created_at` / `updated_at`（`DATETIME(6)`）；用 `gmt_create` / `ctime`；业务时间用 `xxx_at` 或 `DATETIME` / `TIMESTAMP`（`created_at` / `updated_at` 除外，它们用 `DATETIME(6)`）→ 必须 `{动作}_time` `BIGINT UNSIGNED` 毫秒
 ❌ 软删除（`is_deleted` / `deleted_at`）、`created_by` / `updated_by`、非 `id` 列的 `AUTO_INCREMENT`、`FOREIGN KEY`、`ENUM` / `BOOLEAN` / `FLOAT` / `DOUBLE`、触发器 / 存储过程
 ❌ 布尔字段不带 `is_` / `has_` / `can_` 前缀（`enabled` / `active`）→ 必须 `is_enabled` / `is_active`（类型 `TINYINT UNSIGNED`）
 ❌ 业务版本字段裸 `version` → 必须 `rule_version` / `formula_version` / `config_version` / `schema_version`（裸 `version` 永远是乐观锁语义）
@@ -221,8 +221,8 @@ CREATE TABLE `auth`.`users` (
     `is_active`   TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1=是 2=否',       -- ✅ 布尔 is_ 前缀 + TINYINT
     `create_time` BIGINT UNSIGNED  NOT NULL COMMENT '创建时间，毫秒时间戳（UTC）',   -- ✅ 应用层写入
     `update_time` BIGINT UNSIGNED  NOT NULL COMMENT '更新时间，毫秒时间戳（UTC）',
-    `created_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `created_at`  DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+    `updated_at`  DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='用户表';
 ```

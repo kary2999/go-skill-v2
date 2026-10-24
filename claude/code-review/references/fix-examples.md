@@ -86,11 +86,11 @@ CREATE TABLE `trade`.`orders` (
 gmt_create TIMESTAMP,
 gmt_modified TIMESTAMP
 
--- ✅ 毫秒时间戳由应用层写；TIMESTAMP 由库维护，仅运维参考
+-- ✅ 毫秒时间戳由应用层写；DATETIME(6) 由库维护，仅运维参考
 create_time BIGINT UNSIGNED NOT NULL COMMENT '创建时间，毫秒时间戳（UTC）',
 update_time BIGINT UNSIGNED NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
-created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间'
 ```
 
 ### §5.2 / database §4.4 不使用软删除
@@ -155,6 +155,6 @@ TODO[skill: code-review · 命名 §X.X]: 原 → 推荐
 -- TODO[skill: code-review · 命名 §1.2]: user_id BIGINT → uid VARCHAR(64)
 user_id BIGINT NOT NULL,
 
--- TODO[skill: code-review · 命名 §2.2]: gmt_create TIMESTAMP → create_time BIGINT UNSIGNED（毫秒）+ created_at TIMESTAMP（库维护）
+-- TODO[skill: code-review · 命名 §2.2]: gmt_create TIMESTAMP → create_time BIGINT UNSIGNED（毫秒）+ created_at DATETIME(6)（库维护）
 gmt_create TIMESTAMP NOT NULL,
 ```

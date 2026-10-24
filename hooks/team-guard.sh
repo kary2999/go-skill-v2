@@ -221,12 +221,21 @@ $(echo "$TW" | sed 's/^/   /')")
       if grep -qiE 'CREATE\s+TABLE' "$FILE"; then
         grep -qiE '\bcreate_time\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 create_time BIGINT UNSIGNED（毫秒时间戳，应用层写入）")
         grep -qiE '\bupdate_time\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 update_time BIGINT UNSIGNED（毫秒时间戳，每次更新必写）")
-        grep -qiE '\bcreated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
-        grep -qiE '\bupdated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        grep -qiE '\bcreated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)")
+        grep -qiE '\bupdated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)")
       fi
       TS=$(grep -inE '\b(TIMESTAMPTZ|DATETIME|TIMESTAMP)\b' "$FILE" | grep -ivE '\b(created_at|updated_at)\b' | grep -v '^\s*--' | head -5 || true)
-      [[ -n "$TS" ]] && ERRORS+=("⛔ [time-type(sql)] $FILE 业务时间用 BIGINT UNSIGNED 毫秒（{动作}_time）；TIMESTAMP 仅限 created_at / updated_at（database.md §4.6）
+      [[ -n "$TS" ]] && ERRORS+=("⛔ [time-type(sql)] $FILE 业务时间用 BIGINT UNSIGNED 毫秒（{动作}_time）；库维护的 created_at / updated_at 用 DATETIME(6)（database.md §4.6）
 $(echo "$TS" | sed 's/^/   /')")
+      TS_ANY=$(grep -inE '(^|[^A-Za-z_])TIMESTAMP(TZ)?([^A-Za-z_]|$)' "$FILE" | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+      [[ -n "$TS_ANY" ]] && ERRORS+=("⛔ [timestamp-type(sql)] $FILE 全库禁用 TIMESTAMP（2038 上限、依赖会话时区）；created_at / updated_at 用 DATETIME(6)（database.md §4.1）
+      $(echo "$TS_ANY" | sed 's/^/   /')")
+      AT_BAD=$(grep -inE '`?(created_at|updated_at)`?[[:space:]]+[A-Za-z]' "$FILE" | grep -vE 'DATETIME\(6\)' | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+      [[ -n "$AT_BAD" ]] && ERRORS+=("⛔ [at-type(sql)] $FILE created_at / updated_at 必须是 DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)（updated_at 另加 ON UPDATE CURRENT_TIMESTAMP(6)）
+      $(echo "$AT_BAD" | sed 's/^/   /')")
+      CT_BAD=$(grep -inE 'CURRENT_TIMESTAMP([^(A-Za-z_]|$)' "$FILE" | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+      [[ -n "$CT_BAD" ]] && ERRORS+=("⛔ [ct-precision(sql)] $FILE DEFAULT / ON UPDATE 必须写 CURRENT_TIMESTAMP(6)，精度须与 DATETIME(6) 一致，否则 MySQL 报 1067 / 1294
+$(echo "$CT_BAD" | sed 's/^/   /')")
       VC=$(grep -inE '\bVARCHAR\b' "$FILE" | grep -ivE '\bVARCHAR\s*\(' | grep -v '^\s*--' | head -5 || true)
       [[ -n "$VC" ]] && ERRORS+=("⛔ [varchar-len(sql)] $FILE VARCHAR 必须声明长度，如 VARCHAR(255)
 $(echo "$VC" | sed 's/^/   /')")
@@ -329,12 +338,21 @@ $(echo "$CAMEL" | sed 's/^/   /')
     if grep -qiE 'CREATE\s+TABLE' "$FILE"; then
       grep -qiE '\bcreate_time\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 create_time BIGINT UNSIGNED（毫秒时间戳，应用层写入）")
       grep -qiE '\bupdate_time\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 update_time BIGINT UNSIGNED（毫秒时间戳，每次更新必写）")
-      grep -qiE '\bcreated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
-      grep -qiE '\bupdated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+      grep -qiE '\bcreated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)")
+      grep -qiE '\bupdated_at\b' "$FILE" || ERRORS+=("⛔ [sql-timestamps] $FILE CREATE TABLE 缺少 updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)")
     fi
     TS=$(grep -inE '\b(TIMESTAMPTZ|DATETIME|TIMESTAMP)\b' "$FILE" | grep -ivE '\b(created_at|updated_at)\b' | grep -v '^\s*--' | head -5 || true)
-    [[ -n "$TS" ]] && ERRORS+=("⛔ [time-type(sql)] $FILE 业务时间用 BIGINT UNSIGNED 毫秒（{动作}_time）；TIMESTAMP 仅限 created_at / updated_at（database.md §4.6）
+    [[ -n "$TS" ]] && ERRORS+=("⛔ [time-type(sql)] $FILE 业务时间用 BIGINT UNSIGNED 毫秒（{动作}_time）；库维护的 created_at / updated_at 用 DATETIME(6)（database.md §4.6）
 $(echo "$TS" | sed 's/^/   /')")
+    TS_ANY=$(grep -inE '(^|[^A-Za-z_])TIMESTAMP(TZ)?([^A-Za-z_]|$)' "$FILE" | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+    [[ -n "$TS_ANY" ]] && ERRORS+=("⛔ [timestamp-type(sql)] $FILE 全库禁用 TIMESTAMP（2038 上限、依赖会话时区）；created_at / updated_at 用 DATETIME(6)（database.md §4.1）
+    $(echo "$TS_ANY" | sed 's/^/   /')")
+    AT_BAD=$(grep -inE '`?(created_at|updated_at)`?[[:space:]]+[A-Za-z]' "$FILE" | grep -vE 'DATETIME\(6\)' | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+    [[ -n "$AT_BAD" ]] && ERRORS+=("⛔ [at-type(sql)] $FILE created_at / updated_at 必须是 DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)（updated_at 另加 ON UPDATE CURRENT_TIMESTAMP(6)）
+    $(echo "$AT_BAD" | sed 's/^/   /')")
+    CT_BAD=$(grep -inE 'CURRENT_TIMESTAMP([^(A-Za-z_]|$)' "$FILE" | grep -v '^[0-9]*:[[:space:]]*--' | head -5 || true)
+    [[ -n "$CT_BAD" ]] && ERRORS+=("⛔ [ct-precision(sql)] $FILE DEFAULT / ON UPDATE 必须写 CURRENT_TIMESTAMP(6)，精度须与 DATETIME(6) 一致，否则 MySQL 报 1067 / 1294
+$(echo "$CT_BAD" | sed 's/^/   /')")
     VC=$(grep -inE '\bVARCHAR\b' "$FILE" | grep -ivE '\bVARCHAR\s*\(' | grep -v '^\s*--' | head -5 || true)
     [[ -n "$VC" ]] && ERRORS+=("⛔ [varchar-len(sql)] $FILE VARCHAR 需声明长度
 $(echo "$VC" | sed 's/^/   /')")

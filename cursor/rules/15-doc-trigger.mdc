@@ -32,7 +32,7 @@ globs:
 
 - 用户主体字段一律 `uid`（**禁** `user_id` / `userId` / `member_id`）
 - **无软删除**：禁 `is_deleted` / `deleted_at`；禁 `created_by` / `updated_by`
-- 时间：`create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒，必备）；其余业务时间 `{动作}_time` 毫秒；`created_at` / `updated_at`（`TIMESTAMP`）仅库维护
+- 时间：`create_time` / `update_time`（`BIGINT UNSIGNED` 毫秒，必备）；其余业务时间 `{动作}_time` 毫秒；`created_at` / `updated_at`（`DATETIME(6)`）仅库维护
 - 金额带业务前缀（`order_amount` / `fee_amount`），**禁裸** `amount`；API 中金额、ID 为 string
 - 业务版本字段必须前缀（`rule_version` / `formula_version`），裸 `version` 保留乐观锁
 - 布尔列必须 `is_` 开头（`TINYINT UNSIGNED`）

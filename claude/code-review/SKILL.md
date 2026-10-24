@@ -211,7 +211,7 @@ TODO[review:<级别>·<规则编号> conf=<分>]: <原> → <推荐>（<一句�
 | 命名违规 | 推荐 | 规范段 |
 |---|---|---|
 | `user_id` / `userId` / `member_id` | `uid` | §1.2 |
-| `gmt_create` / `ctime` / 缺 `create_time` | `create_time`（BIGINT 毫秒）+ `created_at`（TIMESTAMP 库维护） | §2.2 |
+| `gmt_create` / `ctime` / 缺 `create_time` | `create_time`（BIGINT 毫秒）+ `created_at`（DATETIME(6) 库维护） | §2.2 |
 | `gmt_modified` / 缺 `update_time` | `update_time` + `updated_at` | §2.2 |
 | `is_deleted` / `deleted_at` 软删除 | 本项目不使用软删除 | §5.2 |
 | 裸 `amount` | `<业务>_amount`（`order_amount`） | §4.2 |

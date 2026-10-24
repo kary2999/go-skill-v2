@@ -26,8 +26,8 @@ argument-hint: <表名 + 业务说明，如 "orders 订单表，含币种、价�
 `version`     INT UNSIGNED     NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',   -- 有并发更新时
 `create_time` BIGINT UNSIGNED  NOT NULL COMMENT '创建时间，毫秒时间戳（UTC），应用层写入',
 `update_time` BIGINT UNSIGNED  NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
-`created_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-`updated_at`  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+`created_at`  DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+`updated_at`  DATETIME(6)      NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间',
 PRIMARY KEY (`id`),
 UNIQUE KEY `uk_{表}_oid` (`oid`)
 ```
@@ -36,7 +36,7 @@ UNIQUE KEY `uk_{表}_oid` (`oid`)
 
 ### 命名与类型约束
 
-- 业务时间点：`{动作}_time` `BIGINT UNSIGNED` 毫秒（`paid_time`）；`TIMESTAMP` 仅限 `created_at` / `updated_at`
+- 业务时间点：`{动作}_time` `BIGINT UNSIGNED` 毫秒（`paid_time`）；全库禁用 `TIMESTAMP`；`created_at` / `updated_at` 用 `DATETIME(6)`（`DEFAULT` / `ON UPDATE` 都写 `CURRENT_TIMESTAMP(6)`）
 - 状态 / 类型 / 枚举：`_status` / `_type` `TINYINT UNSIGNED`（`0` 保留未知），禁 `ENUM` / `VARCHAR`；COMMENT 列全取值
 - 布尔：`is_` / `has_` / `can_` 开头，`TINYINT UNSIGNED`（`1=是 2=否 0=未知`），禁 `BOOLEAN`
 - 金额必带业务前缀：`order_amount` / `fee_amount`，禁裸 `amount`；加密货币 `DECIMAL(38,18)`，法币 `DECIMAL(28,8)`，禁 `FLOAT` / `DOUBLE`

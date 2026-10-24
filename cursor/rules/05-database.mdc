@@ -22,11 +22,11 @@ alwaysApply: false
 `oid`         CHAR(36)        NOT NULL COMMENT '业务 ID，UUIDv7 小写 36 位，应用层生成',
 `create_time` BIGINT UNSIGNED NOT NULL COMMENT '创建时间，毫秒时间戳（UTC）',
 `update_time` BIGINT UNSIGNED NOT NULL COMMENT '更新时间，毫秒时间戳（UTC），每次更新必写',
-`created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-`updated_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+`created_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+`updated_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间'
 ```
 - `create_time` / `update_time` 由应用层写，业务以它们为准；`created_at` / `updated_at` 由库维护，仅运维参考
-- 业务时间点一律 `{动作}_time BIGINT UNSIGNED`（毫秒）；`TIMESTAMP` 仅限 `created_at` / `updated_at`（2038 上限）
+- 业务时间点一律 `{动作}_time BIGINT UNSIGNED`（毫秒）；**全库禁用 `TIMESTAMP`**；`created_at` / `updated_at` 用 `DATETIME(6)`，`DEFAULT` / `ON UPDATE` 必须写 `CURRENT_TIMESTAMP(6)`（精度不一致 MySQL 报 1067 / 1294）；`DATETIME` 不带时区，实例与连接统一 UTC，禁止 `SET time_zone`
 - **不设** `deleted_at` / `created_by` / `updated_by`；**不使用软删除**，允许物理 DELETE（资金类先归档，批量分批 ≤ 1000）
 - **禁止** `FOREIGN KEY`、触发器 / 存储过程 / EVENT；自增只允许 `id BIGINT UNSIGNED`（库内主键），业务 ID 用 `oid`
 - 多租户表加 `platform_id VARCHAR(32)` / `uid VARCHAR(64)`，索引前缀含 `platform_id`；用户字段统一 `uid`

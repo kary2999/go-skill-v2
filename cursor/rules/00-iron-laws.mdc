@@ -22,7 +22,7 @@ globs:
 | 4 | 业务代码禁用 `panic`；仅允许 `init()` / 启动阶段 | panic 会让整个进程挂掉，影响该实例上所有请求；受 K8s 调度时还会触发滚动重启 |
 | 5 | goroutine 必须有退出机制（`context` / `errgroup`）；禁止裸 `go func()` | 裸 goroutine = 泄漏；长期运行的服务 goroutine 数会线性增长直到 OOM |
 | 6 | 金额/数量用 `decimal.Decimal`（DB `DECIMAL(38,18)` / `DECIMAL(28,8)`，API 用 string）；禁止 `float64` | 浮点精度丢失在交易场景不可接受（0.1 + 0.2 ≠ 0.3），会导致账务对不平 |
-| 7 | 业务时间存 `BIGINT UNSIGNED` 毫秒 UTC（`create_time` / `update_time` 必备，其余 `{动作}_time`）；`TIMESTAMP` 仅限 `created_at` / `updated_at`；禁止存本地时间 / 时区字符串 | 本地时间在边界日会差一天；`TIMESTAMP` 有 2038-01-19 上限，不能存未来时间 |
+| 7 | 业务时间存 `BIGINT UNSIGNED` 毫秒 UTC（`create_time` / `update_time` 必备，其余 `{动作}_time`）；库维护的 `created_at` / `updated_at` 用 `DATETIME(6)`；**全库禁用 `TIMESTAMP`**；禁止存本地时间 / 时区字符串，会话不得 `SET time_zone` | 本地时间在边界日会差一天；`TIMESTAMP` 有 2038 上限；`DATETIME` 不带时区，会话时区偏离 UTC 会写入本地时间 |
 | 8 | 日志只用公共库 `logging`（基于 slog），结构化、snake_case 字段，必带 `trace_id`；禁止 `fmt.Println` | 非结构化日志无法按字段查询；没有 trace_id 无法跨服务还原调用链 |
 | 9 | SQL 禁止 `SELECT *`；禁止循环内查询（N+1）；分页用游标 | SELECT * 导致新增列后老代码拉多余数据、占带宽、破坏协议；OFFSET 大翻页 O(N) 扫描 |
 | 10 | DB 禁止外键、软删除；关联由应用层维护；每表自增 `id`（仅库内）+ `oid`（UUIDv7，应用层生成，对外 / 跨表引用 `{entity}_oid`） | 外键阻塞分库分表和 DDL；自增 `id` 跨库不唯一且暴露业务量，所以不出表；软删除字段会让唯一约束变复杂 |

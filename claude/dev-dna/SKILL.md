@@ -61,7 +61,7 @@ privacy: |
 
 三者并行不冲突。优先级：**Persona > dev-dna > 团队规范 > 通用 Go 知识**。
 
-如果团队规范和你 dev-dna 偏好冲突（例如团队铁律要求 xerror，但你 profile 里写"我喜欢 errors.New"），**以团队规范为准**，并提醒你这是个人偏好与团队冲突。
+如果团队规范和你 dev-dna 偏好冲突（例如团队铁律要求 AppError + errcode，但你 profile 里写"我喜欢 errors.New"），**以团队规范为准**，并提醒你这是个人偏好与团队冲突。
 
 ## 维护
 
